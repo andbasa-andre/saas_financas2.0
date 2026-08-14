@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useFinance } from '@/context/FinanceContext';
-import { Target, Sparkles, Calendar } from 'lucide-react';
+import { Target, Calendar } from 'lucide-react';
 
 export const PlanningSummaryWidget: React.FC = () => {
   const { summary } = useFinance();
@@ -23,8 +23,8 @@ export const PlanningSummaryWidget: React.FC = () => {
           </div>
           <h3 className="text-sm font-bold tracking-wide">Planejamento & Teto Diário Sugerido</h3>
         </div>
-        <span className="flex items-center gap-1 text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-xl border border-emerald-500/20">
-          <Sparkles className="w-3.5 h-3.5" /> Indicador Inteligente
+        <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-3 py-1 rounded-xl border border-emerald-500/20">
+          Resumo Mensal
         </span>
       </div>
 

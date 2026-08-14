@@ -4,17 +4,18 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
-  LayoutDashboard, ArrowLeftRight, Target, Landmark, 
+  LayoutDashboard, ArrowLeftRight, CreditCard, Target, Landmark, 
   PieChart, Tag, Building, Settings, Pin, PinOff 
 } from 'lucide-react';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/dashboard/lancamentos', label: 'Lançamentos', icon: ArrowLeftRight },
+  { href: '/dashboard/cartoes', label: 'Cartões & Faturas', icon: CreditCard },
   { href: '/dashboard/planejamento', label: 'Planejamento', icon: Target },
   { href: '/dashboard/patrimonio', label: 'Patrimônio', icon: Landmark },
   { href: '/dashboard/relatorios', label: 'Relatórios', icon: PieChart },
-  { href: '/dashboard/contas', label: 'Contas & Cartões', icon: Building },
+  { href: '/dashboard/contas', label: 'Contas Bancárias', icon: Building },
   { href: '/dashboard/categorias', label: 'Categorias', icon: Tag },
   { href: '/dashboard/configuracoes', label: 'Configurações', icon: Settings },
 ];

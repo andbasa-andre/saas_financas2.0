@@ -110,7 +110,8 @@ export function calculateFinancialSummary(
     projectedBalance: Math.round(projectedBalance * 100) / 100,
     netWorth: Math.round(netWorth * 100) / 100,
     dailySuggestedLimit,
-    remainingDaysInMonth
+    remainingDaysInMonth,
+    totalCreditCommitted: 0
   };
 }
 

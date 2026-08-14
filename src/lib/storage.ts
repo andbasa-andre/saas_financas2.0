@@ -1,6 +1,7 @@
 import { 
   Account, Category, Transaction, Budget, Asset, Liability, 
-  CreditCard, NetWorthSnapshot, Profile, FinancialSummary 
+  CreditCard, CreditCardInvoice, CreditCardPurchase, CreditCardPayment, 
+  NetWorthSnapshot, Profile 
 } from '@/types/finance';
 
 const STORAGE_KEYS = {
@@ -13,6 +14,9 @@ const STORAGE_KEYS = {
   ASSETS: 'fin_assets',
   LIABILITIES: 'fin_liabilities',
   CREDIT_CARDS: 'fin_credit_cards',
+  CREDIT_CARD_INVOICES: 'fin_card_invoices',
+  CREDIT_CARD_PURCHASES: 'fin_card_purchases',
+  CREDIT_CARD_PAYMENTS: 'fin_card_payments',
   NET_WORTH_SNAPSHOTS: 'fin_snapshots'
 };
 
@@ -157,15 +161,92 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
         id: `card-${userId}-1`,
         user_id: userId,
         name: 'Nubank Violeta',
-        limit_amount: 12000.00,
-        closing_day: 25,
-        due_day: 5,
-        color: '#8b5cf6',
+        issuer: 'Nubank',
+        last_four_digits: '1234',
         brand: 'Mastercard Black',
+        limit_amount: 8000.00,
+        closing_day: 5,
+        due_day: 12,
+        color: '#8b5cf6',
+        is_active: true,
+        account_id: `acc-${userId}-1`
+      },
+      {
+        id: `card-${userId}-2`,
+        user_id: userId,
+        name: 'Itaú Personalité',
+        issuer: 'Itaú',
+        last_four_digits: '5678',
+        brand: 'Visa Platinum',
+        limit_amount: 6000.00,
+        closing_day: 15,
+        due_day: 22,
+        color: '#f97316',
+        is_active: true,
         account_id: `acc-${userId}-1`
       }
     ];
     setItem(STORAGE_KEYS.CREDIT_CARDS, [...existingCards, ...userCards]);
+  }
+
+  // Credit Card Purchases
+  const existingPurchases = getItem<CreditCardPurchase[]>(STORAGE_KEYS.CREDIT_CARD_PURCHASES, []);
+  let userPurchases = existingPurchases.filter(p => p.user_id === userId);
+
+  if (userPurchases.length === 0) {
+    const eletrCat = userCategories.find(c => c.name === 'Compras & Vestuário')?.id;
+    const marketCat = userCategories.find(c => c.name === 'Supermercado')?.id;
+    const uberCat = userCategories.find(c => c.name === 'Combustível & Transporte')?.id;
+
+    // Sample 12x installment purchase: Notebook R$ 3600 (12x de R$ 300)
+    for (let i = 1; i <= 12; i++) {
+      const d = new Date(2026, 7 + (i - 1), 6); // Month 8 to Month 19
+      const monthStr = String(d.getMonth() + 1).padStart(2, '0');
+      const yearStr = d.getFullYear();
+
+      userPurchases.push({
+        id: `pur-${userId}-nb-${i}`,
+        user_id: userId,
+        credit_card_id: `card-${userId}-1`,
+        category_id: eletrCat,
+        description: `Notebook Dell Inspiron (${i}/12)`,
+        total_amount: 3600.00,
+        installment_number: i,
+        total_installments: 12,
+        installment_amount: 300.00,
+        purchase_date: `${yearStr}-${monthStr}-06`
+      });
+    }
+
+    // Single purchases for August invoice (closing 05/09, due 12/09)
+    userPurchases.push(
+      {
+        id: `pur-${userId}-1`,
+        user_id: userId,
+        credit_card_id: `card-${userId}-1`,
+        category_id: marketCat,
+        description: 'Supermercado Carrefour',
+        total_amount: 350.00,
+        installment_number: 1,
+        total_installments: 1,
+        installment_amount: 350.00,
+        purchase_date: '2026-08-08'
+      },
+      {
+        id: `pur-${userId}-2`,
+        user_id: userId,
+        credit_card_id: `card-${userId}-1`,
+        category_id: uberCat,
+        description: 'Uber Reunião',
+        total_amount: 42.80,
+        installment_number: 1,
+        total_installments: 1,
+        installment_amount: 42.80,
+        purchase_date: '2026-08-10'
+      }
+    );
+
+    setItem(STORAGE_KEYS.CREDIT_CARD_PURCHASES, [...existingPurchases, ...userPurchases]);
   }
 
   // Sample Transactions for current month (2026-08)
@@ -174,11 +255,8 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
 
   if (userTransactions.length === 0) {
     const salaryCat = userCategories.find(c => c.name === 'Salário')?.id;
-    const marketCat = userCategories.find(c => c.name === 'Supermercado')?.id;
     const rentCat = userCategories.find(c => c.name === 'Moradia & Aluguel')?.id;
-    const uberCat = userCategories.find(c => c.name === 'Combustível & Transporte')?.id;
     const netCat = userCategories.find(c => c.name === 'Internet & Telefone')?.id;
-    const streamCat = userCategories.find(c => c.name === 'Assinaturas & Streaming')?.id;
     const energyCat = userCategories.find(c => c.name === 'Energia & Água')?.id;
 
     userTransactions = [
@@ -207,30 +285,6 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
         payment_method: 'pix'
       },
       {
-        id: `tx-${userId}-3`,
-        user_id: userId,
-        account_id: `acc-${userId}-1`,
-        category_id: marketCat,
-        description: 'Supermercado Carrefour',
-        amount: 890.50,
-        date: '2026-08-10',
-        type: 'expense',
-        status: 'completed',
-        payment_method: 'credit_card'
-      },
-      {
-        id: `tx-${userId}-4`,
-        user_id: userId,
-        account_id: `acc-${userId}-1`,
-        category_id: uberCat,
-        description: 'Uber para Reunião',
-        amount: 42.80,
-        date: '2026-08-12',
-        type: 'expense',
-        status: 'completed',
-        payment_method: 'credit_card'
-      },
-      {
         id: `tx-${userId}-5`,
         user_id: userId,
         account_id: `acc-${userId}-1`,
@@ -252,31 +306,6 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
         date: '2026-08-20',
         type: 'expense',
         status: 'planned',
-        payment_method: 'pix'
-      },
-      {
-        id: `tx-${userId}-7`,
-        user_id: userId,
-        account_id: `acc-${userId}-1`,
-        category_id: streamCat,
-        description: 'Netflix Premium',
-        amount: 55.90,
-        date: '2026-08-25',
-        type: 'expense',
-        status: 'planned',
-        payment_method: 'credit_card'
-      },
-      // Transfer example
-      {
-        id: `tx-${userId}-8`,
-        user_id: userId,
-        account_id: `acc-${userId}-1`,
-        destination_account_id: `acc-${userId}-2`,
-        description: 'Aplicação na Reserva',
-        amount: 1000.00,
-        date: '2026-08-06',
-        type: 'transfer',
-        status: 'completed',
         payment_method: 'pix'
       }
     ];

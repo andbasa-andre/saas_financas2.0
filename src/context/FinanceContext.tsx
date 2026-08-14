@@ -3,12 +3,16 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
   Account, Category, Transaction, Budget, Asset, Liability, 
-  CreditCard, NetWorthSnapshot, Profile, FinancialSummary 
+  CreditCard, CreditCardInvoice, CreditCardPurchase, CreditCardPayment, 
+  NetWorthSnapshot, Profile, FinancialSummary 
 } from '@/types/finance';
 import { 
   getItem, setItem, getLocalUser, setLocalUser, initializeSeedData 
 } from '@/lib/storage';
 import { calculateFinancialSummary, calculateAccountBalances } from '@/lib/calculations';
+import { 
+  calculateCardLimits, generateInstallmentPurchases, getInvoicePeriodForPurchase, determineInvoiceStatus 
+} from '@/lib/creditCardEngine';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 
 interface FinanceContextType {
@@ -27,6 +31,8 @@ interface FinanceContextType {
   assets: Asset[];
   liabilities: Liability[];
   creditCards: CreditCard[];
+  cardPurchases: CreditCardPurchase[];
+  cardPayments: CreditCardPayment[];
   snapshots: NetWorthSnapshot[];
 
   summary: FinancialSummary;
@@ -57,6 +63,26 @@ interface FinanceContextType {
   
   addLiability: (liability: Omit<Liability, 'id' | 'user_id'>) => void;
   deleteLiability: (id: string) => void;
+
+  // Credit Card Methods
+  addCreditCard: (card: Omit<CreditCard, 'id' | 'user_id'>) => void;
+  deleteCreditCard: (id: string) => void;
+  addCreditCardPurchase: (
+    cardId: string, 
+    description: string, 
+    totalAmount: number, 
+    installments: number, 
+    purchaseDate: string, 
+    categoryId?: string
+  ) => void;
+  payInvoice: (
+    cardId: string, 
+    month: number, 
+    year: number, 
+    accountId: string, 
+    amount: number, 
+    paymentDate: string
+  ) => void;
   
   theme: 'light' | 'dark';
   toggleTheme: () => void;
@@ -81,6 +107,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [liabilities, setLiabilities] = useState<Liability[]>([]);
   const [creditCards, setCreditCards] = useState<CreditCard[]>([]);
+  const [cardPurchases, setCardPurchases] = useState<CreditCardPurchase[]>([]);
+  const [cardPayments, setCardPayments] = useState<CreditCardPayment[]>([]);
   const [snapshots, setSnapshots] = useState<NetWorthSnapshot[]>([]);
 
   // Initialize Auth & Data
@@ -100,7 +128,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           setUser(profile);
           loadUserData(profile.id);
         } else {
-          // Fallback local user if logged in locally
           const localU = getLocalUser();
           setUser(localU);
           if (localU) {
@@ -145,6 +172,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     const allAssets = getItem<Asset[]>('fin_assets', []);
     const allLiabilities = getItem<Liability[]>('fin_liabilities', []);
     const allCards = getItem<CreditCard[]>('fin_credit_cards', []);
+    const allPurchases = getItem<CreditCardPurchase[]>('fin_card_purchases', []);
+    const allPayments = getItem<CreditCardPayment[]>('fin_card_payments', []);
     const allSnapshots = getItem<NetWorthSnapshot[]>('fin_snapshots', []);
 
     setAccounts(allAccounts.filter(a => a.user_id === userId));
@@ -154,6 +183,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setAssets(allAssets.filter(a => a.user_id === userId));
     setLiabilities(allLiabilities.filter(l => l.user_id === userId));
     setCreditCards(allCards.filter(c => c.user_id === userId));
+    setCardPurchases(allPurchases.filter(p => p.user_id === userId));
+    setCardPayments(allPayments.filter(pay => pay.user_id === userId));
     setSnapshots(allSnapshots.filter(s => s.user_id === userId));
   };
 
@@ -178,7 +209,6 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       loadUserData(profile.id);
       return true;
     } else {
-      // Local auth simulation
       const mockProfile: Profile = {
         id: 'demo-user-123',
         name: email.split('@')[0] || 'Usuário',
@@ -391,8 +421,120 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setLiabilities(updatedAll.filter(l => l.user_id === user.id));
   };
 
+  // Credit Card Methods
+  const addCreditCard = (card: Omit<CreditCard, 'id' | 'user_id'>) => {
+    if (!user) return;
+    const newCard: CreditCard = {
+      ...card,
+      id: `card-${Date.now()}`,
+      user_id: user.id
+    };
+    const all = getItem<CreditCard[]>('fin_credit_cards', []);
+    const updatedAll = [...all, newCard];
+    setItem('fin_credit_cards', updatedAll);
+    setCreditCards(updatedAll.filter(c => c.user_id === user.id));
+  };
+
+  const deleteCreditCard = (id: string) => {
+    if (!user) return;
+    const all = getItem<CreditCard[]>('fin_credit_cards', []);
+    const updatedAll = all.filter(c => c.id !== id);
+    setItem('fin_credit_cards', updatedAll);
+    setCreditCards(updatedAll.filter(c => c.user_id === user.id));
+  };
+
+  const addCreditCardPurchase = (
+    cardId: string,
+    description: string,
+    totalAmount: number,
+    installments: number,
+    purchaseDate: string,
+    categoryId?: string
+  ) => {
+    if (!user) return;
+    const card = creditCards.find(c => c.id === cardId);
+    if (!card) return;
+
+    const generated = generateInstallmentPurchases(
+      card,
+      description,
+      totalAmount,
+      installments,
+      purchaseDate,
+      categoryId,
+      user.id
+    );
+
+    const fullPurchases: CreditCardPurchase[] = generated.map((p, idx) => ({
+      ...p,
+      id: `pur-${Date.now()}-${idx + 1}`
+    }));
+
+    const allPurchases = getItem<CreditCardPurchase[]>('fin_card_purchases', []);
+    const updatedPurchases = [...fullPurchases, ...allPurchases];
+    setItem('fin_card_purchases', updatedPurchases);
+    setCardPurchases(updatedPurchases.filter(p => p.user_id === user.id));
+  };
+
+  const payInvoice = (
+    cardId: string,
+    month: number,
+    year: number,
+    accountId: string,
+    amount: number,
+    paymentDate: string
+  ) => {
+    if (!user) return;
+    const newPayment: CreditCardPayment = {
+      id: `pay-${Date.now()}`,
+      user_id: user.id,
+      invoice_id: `inv-${cardId}-${year}-${month}`,
+      account_id: accountId,
+      amount,
+      payment_date: paymentDate
+    };
+
+    const allPayments = getItem<CreditCardPayment[]>('fin_card_payments', []);
+    const updatedPayments = [newPayment, ...allPayments];
+    setItem('fin_card_payments', updatedPayments);
+    setCardPayments(updatedPayments.filter(p => p.user_id === user.id));
+
+    // Register invoice payment transaction in transactions to deduct checking account balance ONLY (without adding expense category)
+    addTransaction({
+      account_id: accountId,
+      description: `Pagamento Fatura Cartão (${month}/${year})`,
+      amount,
+      date: paymentDate,
+      type: 'expense',
+      status: 'completed',
+      payment_method: 'credit_card_payment',
+      notes: 'Pagamento de fatura de cartão de crédito (não contabilizado em categorias para evitar duplicação)'
+    });
+  };
+
   // Re-calculate accounts with balances
   const accountsWithBalances = calculateAccountBalances(accounts, transactions);
+
+  // Credit Card limit calculations
+  const cardsWithCalculatedLimits = creditCards.map(card => {
+    const cardPurchasesList = cardPurchases.filter(p => p.credit_card_id === card.id);
+    const cardPaymentsList = cardPayments.filter(p => {
+      return p.invoice_id.startsWith(`inv-${card.id}`);
+    });
+
+    const limits = calculateCardLimits(card, cardPurchasesList, cardPaymentsList);
+    return {
+      ...card,
+      committed_limit: limits.committedLimit,
+      available_limit: limits.availableLimit,
+      used_limit: limits.committedLimit
+    };
+  });
+
+  // Calculate total credit committed to include in liabilities for Net Worth
+  const totalCreditCommitted = cardsWithCalculatedLimits.reduce(
+    (acc, card) => acc + (card.committed_limit || 0), 0
+  );
 
   // Financial summary
   const summary = calculateFinancialSummary(
@@ -419,9 +561,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       budgets,
       assets,
       liabilities,
-      creditCards,
+      creditCards: cardsWithCalculatedLimits,
+      cardPurchases,
+      cardPayments,
       snapshots,
-      summary,
+      summary: {
+        ...summary,
+        totalCreditCommitted
+      },
       login,
       signup,
       logout,
@@ -440,6 +587,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       deleteAsset,
       addLiability,
       deleteLiability,
+      addCreditCard,
+      deleteCreditCard,
+      addCreditCardPurchase,
+      payInvoice,
       theme,
       toggleTheme
     }}>

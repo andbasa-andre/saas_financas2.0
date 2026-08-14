@@ -4,7 +4,7 @@ export type AccountType = 'checking' | 'savings' | 'cash' | 'investment';
 export type AssetType = 'real_estate' | 'vehicle' | 'investment' | 'cash_equivalent' | 'other';
 export type LiabilityType = 'loan' | 'financing' | 'debt' | 'other';
 export type FrequencyType = 'daily' | 'weekly' | 'monthly' | 'yearly';
-export type InvoiceStatus = 'open' | 'closed' | 'paid';
+export type InvoiceStatus = 'open' | 'closed' | 'paid' | 'partially_paid' | 'overdue';
 
 export interface Profile {
   id: string;
@@ -46,8 +46,9 @@ export interface Account {
 export interface Transaction {
   id: string;
   user_id: string;
-  account_id: string;
+  account_id?: string;
   destination_account_id?: string;
+  credit_card_id?: string;
   category_id?: string;
   description: string;
   amount: number;
@@ -55,7 +56,12 @@ export interface Transaction {
   competency_date?: string;
   type: TransactionType;
   status: TransactionStatus;
-  payment_method?: string;
+  payment_method?: string; // 'pix' | 'boleto' | 'credit_card' | 'cash' | 'transfer'
+  installment_info?: {
+    installment_number: number;
+    total_installments: number;
+    parent_id?: string;
+  };
   notes?: string;
   tags?: string[];
   recurring_transaction_id?: string;
@@ -80,14 +86,19 @@ export interface RecurringTransaction {
 export interface CreditCard {
   id: string;
   user_id: string;
-  account_id?: string;
+  account_id?: string; // Conta padrão para pagamento
   name: string;
+  issuer: string;
+  last_four_digits: string;
+  brand: string;
   limit_amount: number;
   closing_day: number;
   due_day: number;
   color: string;
-  brand: string;
+  is_active: boolean;
   used_limit?: number;
+  committed_limit?: number;
+  available_limit?: number;
 }
 
 export interface CreditCardInvoice {
@@ -96,11 +107,41 @@ export interface CreditCardInvoice {
   credit_card_id: string;
   month: number;
   year: number;
+  period_start: string;
+  period_end: string;
   closing_date: string;
   due_date: string;
-  status: InvoiceStatus;
+  total_amount: number;
   paid_amount: number;
-  total_amount?: number;
+  remaining_amount?: number;
+  status: InvoiceStatus;
+}
+
+export interface CreditCardPurchase {
+  id: string;
+  user_id: string;
+  credit_card_id: string;
+  invoice_id?: string;
+  transaction_id?: string;
+  category_id?: string;
+  description: string;
+  total_amount: number;
+  installment_number: number;
+  total_installments: number;
+  installment_amount: number;
+  purchase_date: string;
+  parent_purchase_id?: string;
+  created_at?: string;
+}
+
+export interface CreditCardPayment {
+  id: string;
+  user_id: string;
+  invoice_id: string;
+  account_id: string;
+  amount: number;
+  payment_date: string;
+  transaction_id?: string;
 }
 
 export interface Budget {
@@ -152,4 +193,5 @@ export interface FinancialSummary {
   netWorth: number;
   dailySuggestedLimit: number;
   remainingDaysInMonth: number;
+  totalCreditCommitted: number;
 }

@@ -9,10 +9,13 @@ import { EvolutionChart } from '@/components/dashboard/EvolutionChart';
 import { CategoryExpenseChart } from '@/components/dashboard/CategoryExpenseChart';
 import { PlanningSummaryWidget } from '@/components/dashboard/PlanningSummaryWidget';
 import { DynamicIcon } from '@/components/ui/Icon';
-import { ArrowRight, CheckCircle2, Clock } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Clock, CreditCard as CardIcon } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { transactions, categories, accounts, selectedYear, selectedMonth, updateTransaction } = useFinance();
+  const { 
+    transactions, categories, accounts, creditCards, 
+    selectedYear, selectedMonth, updateTransaction 
+  } = useFinance();
 
   const monthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   const recentTransactions = transactions
@@ -34,6 +37,50 @@ export default function DashboardPage() {
       {/* Planning & Daily Suggested Limit Banner */}
       <PlanningSummaryWidget />
 
+      {/* Credit Cards Summary Widget */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 rounded-3xl shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <CardIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              Cartões de Crédito
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Limites e obrigações de faturas</p>
+          </div>
+          <Link
+            href="/dashboard/cartoes"
+            className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+          >
+            Gerenciar faturas <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {creditCards.map(card => (
+            <div key={card.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">{card.name}</h4>
+                  <span className="text-[10px] text-slate-400">Vencimento Dia {card.due_day}</span>
+                </div>
+                <CardIcon className="w-5 h-5 text-indigo-500" />
+              </div>
+
+              <div className="space-y-1 pt-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Comprometido:</span>
+                  <span className="font-bold text-rose-600 dark:text-rose-400">{formatBRL(card.committed_limit || 0)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Disponível:</span>
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatBRL(card.available_limit || 0)}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Main Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
@@ -44,7 +91,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent Transactions & Quick Pending Actions */}
+      {/* Recent Transactions */}
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 rounded-3xl shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>

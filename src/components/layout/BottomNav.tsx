@@ -3,14 +3,14 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, ArrowLeftRight, Target, Landmark, PieChart } from 'lucide-react';
+import { LayoutDashboard, ArrowLeftRight, CreditCard, Target, Landmark } from 'lucide-react';
 
 const MOBILE_NAV_ITEMS = [
   { href: '/dashboard', label: 'Início', icon: LayoutDashboard },
   { href: '/dashboard/lancamentos', label: 'Extrato', icon: ArrowLeftRight },
+  { href: '/dashboard/cartoes', label: 'Cartões', icon: CreditCard },
   { href: '/dashboard/planejamento', label: 'Metas', icon: Target },
   { href: '/dashboard/patrimonio', label: 'Patrimônio', icon: Landmark },
-  { href: '/dashboard/relatorios', label: 'Relatórios', icon: PieChart },
 ];
 
 export const BottomNav: React.FC = () => {
