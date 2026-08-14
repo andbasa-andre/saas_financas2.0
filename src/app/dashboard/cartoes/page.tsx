@@ -45,6 +45,14 @@ export default function CreditCardsPage() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
   };
 
+  const formatDateBR = (dateStr: string) => {
+    if (!dateStr || !dateStr.includes('-')) return dateStr;
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  };
+
   const activeCard = creditCards.find(c => c.id === selectedCardId) || creditCards[0];
 
   // Purchases for the selected card
@@ -256,7 +264,7 @@ export default function CreditCardsPage() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Fechamento em <strong>{invPeriod.closingDate}</strong> • Vencimento em <strong>{invPeriod.dueDate}</strong>
+                    Fechamento em <strong>{formatDateBR(invPeriod.closingDate)}</strong> • Vencimento em <strong>{formatDateBR(invPeriod.dueDate)}</strong>
                   </p>
                 </div>
 
@@ -304,7 +312,7 @@ export default function CreditCardsPage() {
                                 {pur.description}
                               </p>
                               <span className="text-xs text-slate-500 dark:text-slate-400">
-                                {pur.purchase_date} • {category?.name || 'Geral'}
+                                {formatDateBR(pur.purchase_date)} • {category?.name || 'Geral'}
                               </span>
                             </div>
                           </div>

@@ -5,7 +5,7 @@ import { useFinance } from '@/context/FinanceContext';
 import { TransactionType, TransactionStatus } from '@/types/finance';
 import { autoCategorizeDescription } from '@/lib/calculations';
 import { DynamicIcon } from '@/components/ui/Icon';
-import { X, ArrowDownRight, ArrowUpRight, ArrowLeftRight, Check, Sparkles } from 'lucide-react';
+import { X, ArrowDownRight, ArrowUpRight, ArrowLeftRight, Check, CreditCard, Tag } from 'lucide-react';
 
 interface QuickTransactionModalProps {
   isOpen: boolean;
@@ -18,13 +18,16 @@ export const QuickTransactionModal: React.FC<QuickTransactionModalProps> = ({
   onClose,
   defaultType = 'expense'
 }) => {
-  const { accounts, categories, addTransaction, selectedYear, selectedMonth } = useFinance();
+  const { accounts, creditCards, categories, addTransaction, addCreditCardPurchase } = useFinance();
 
   const [type, setType] = useState<TransactionType>(defaultType);
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'bank' | 'credit_card'>('bank');
   const [accountId, setAccountId] = useState('');
+  const [creditCardId, setCreditCardId] = useState('');
+  const [installments, setInstallments] = useState(1);
   const [destinationAccountId, setDestinationAccountId] = useState('');
   const [date, setDate] = useState(() => {
     const today = new Date();
@@ -36,12 +39,15 @@ export const QuickTransactionModal: React.FC<QuickTransactionModalProps> = ({
   const [status, setStatus] = useState<TransactionStatus>('completed');
   const [isSuggested, setIsSuggested] = useState(false);
 
-  // Set default account when open
+  // Set default account & credit card when open
   useEffect(() => {
     if (accounts.length > 0 && !accountId) {
       setAccountId(accounts[0].id);
     }
-  }, [accounts, accountId]);
+    if (creditCards.length > 0 && !creditCardId) {
+      setCreditCardId(creditCards[0].id);
+    }
+  }, [accounts, creditCards, accountId, creditCardId]);
 
   // Real-time automatic category suggestion
   useEffect(() => {
@@ -61,28 +67,47 @@ export const QuickTransactionModal: React.FC<QuickTransactionModalProps> = ({
     const numAmount = parseFloat(amount.replace(',', '.'));
     if (isNaN(numAmount) || numAmount <= 0) return;
     if (!description.trim()) return;
-    if (!accountId) return;
 
-    addTransaction({
-      account_id: accountId,
-      destination_account_id: type === 'transfer' ? destinationAccountId : undefined,
-      category_id: type !== 'transfer' ? categoryId : undefined,
-      description: description.trim(),
-      amount: numAmount,
-      date,
-      type,
-      status,
-      payment_method: 'pix'
-    });
+    if (type === 'expense' && paymentMethod === 'credit_card') {
+      if (!creditCardId) return;
+      addCreditCardPurchase(
+        creditCardId,
+        description.trim(),
+        numAmount,
+        installments,
+        date,
+        categoryId || undefined
+      );
+    } else {
+      if (!accountId) return;
+      addTransaction({
+        account_id: accountId,
+        destination_account_id: type === 'transfer' ? destinationAccountId : undefined,
+        category_id: type !== 'transfer' ? categoryId : undefined,
+        description: description.trim(),
+        amount: numAmount,
+        date,
+        type,
+        status,
+        payment_method: 'pix'
+      });
+    }
 
     // Reset and close
     setDescription('');
     setAmount('');
+    setInstallments(1);
     setIsSuggested(false);
     onClose();
   };
 
   const filteredCategories = categories.filter(c => c.type === (type === 'income' ? 'income' : 'expense'));
+  const parsedAmount = parseFloat(amount.replace(',', '.')) || 0;
+  const installmentVal = installments > 0 ? (parsedAmount / installments) : 0;
+
+  const formatBRL = (val: number) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -114,7 +139,7 @@ export const QuickTransactionModal: React.FC<QuickTransactionModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => { setType('income'); setIsSuggested(false); }}
+              onClick={() => { setType('income'); setPaymentMethod('bank'); setIsSuggested(false); }}
               className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold transition-all ${
                 type === 'income'
                   ? 'bg-emerald-500 text-white shadow-sm'
@@ -125,7 +150,7 @@ export const QuickTransactionModal: React.FC<QuickTransactionModalProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => { setType('transfer'); setIsSuggested(false); }}
+              onClick={() => { setType('transfer'); setPaymentMethod('bank'); setIsSuggested(false); }}
               className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold transition-all ${
                 type === 'transfer'
                   ? 'bg-blue-500 text-white shadow-sm'
@@ -136,9 +161,37 @@ export const QuickTransactionModal: React.FC<QuickTransactionModalProps> = ({
             </button>
           </div>
 
+          {/* Payment Mode Selector for Expenses (Bank Account vs Credit Card) */}
+          {type === 'expense' && creditCards.length > 0 && (
+            <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800/60 p-1 text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('bank')}
+                className={`flex-1 py-1.5 rounded-lg text-center font-semibold transition-all ${
+                  paymentMethod === 'bank'
+                    ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                Conta Bancária / Pix
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('credit_card')}
+                className={`flex-1 py-1.5 rounded-lg text-center font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                  paymentMethod === 'credit_card'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                <CreditCard className="w-3.5 h-3.5" /> Cartão de Crédito
+              </button>
+            </div>
+          )}
+
           {/* Amount input */}
           <div>
-            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Valor (R$)</label>
+            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Valor Total (R$)</label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400">R$</span>
               <input
@@ -174,7 +227,7 @@ export const QuickTransactionModal: React.FC<QuickTransactionModalProps> = ({
                 <label className="text-xs font-medium text-slate-500 dark:text-slate-400">Categoria</label>
                 {isSuggested && (
                   <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                    <Sparkles className="w-3 h-3" /> Sugerida automaticamente
+                    <Tag className="w-3 h-3" /> Categoria auto-selecionada
                   </span>
                 )}
               </div>
@@ -193,85 +246,142 @@ export const QuickTransactionModal: React.FC<QuickTransactionModalProps> = ({
             </div>
           )}
 
-          {/* Accounts selection */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-                {type === 'transfer' ? 'Conta de Origem' : 'Conta'}
-              </label>
-              <select
-                value={accountId}
-                onChange={e => setAccountId(e.target.value)}
-                required
-                className="w-full px-3 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-hidden"
-              >
-                {accounts.map(acc => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name} (R$ {acc.current_balance?.toFixed(2)})
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Credit Card Specific Inputs (If expense & credit_card selected) */}
+          {type === 'expense' && paymentMethod === 'credit_card' ? (
+            <div className="space-y-3 p-3.5 bg-indigo-50/50 dark:bg-indigo-950/30 rounded-2xl border border-indigo-100 dark:border-indigo-900/50">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Cartão de Crédito</label>
+                  <select
+                    value={creditCardId}
+                    onChange={e => setCreditCardId(e.target.value)}
+                    required
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold"
+                  >
+                    {creditCards.map(card => (
+                      <option key={card.id} value={card.id}>
+                        {card.name} (•••• {card.last_four_digits})
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {type === 'transfer' ? (
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Parcelamento</label>
+                  <select
+                    value={installments}
+                    onChange={e => setInstallments(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs font-semibold"
+                  >
+                    <option value={1}>À vista (1x)</option>
+                    {[2,3,4,5,6,7,8,9,10,11,12,18,24].map(n => (
+                      <option key={n} value={n}>{n}x parcelado</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {installments > 1 && parsedAmount > 0 && (
+                <div className="text-[11px] font-medium text-indigo-700 dark:text-indigo-300 bg-white/80 dark:bg-slate-900/80 p-2 rounded-xl flex items-center justify-between">
+                  <span>Valor por parcela:</span>
+                  <span className="font-bold">{installments}x de {formatBRL(installmentVal)}</span>
+                </div>
+              )}
+
               <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Conta de Destino</label>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Data da Compra</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={e => setDate(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
+                />
+              </div>
+            </div>
+          ) : (
+            /* Accounts selection (Standard Bank Account flow) */
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  {type === 'transfer' ? 'Conta de Origem' : 'Conta'}
+                </label>
                 <select
-                  value={destinationAccountId}
-                  onChange={e => setDestinationAccountId(e.target.value)}
+                  value={accountId}
+                  onChange={e => setAccountId(e.target.value)}
                   required
                   className="w-full px-3 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-hidden"
                 >
-                  <option value="">Selecione o destino...</option>
-                  {accounts.filter(a => a.id !== accountId).map(acc => (
+                  {accounts.map(acc => (
                     <option key={acc.id} value={acc.id}>
                       {acc.name} (R$ {acc.current_balance?.toFixed(2)})
                     </option>
                   ))}
                 </select>
               </div>
-            ) : (
-              <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Data</label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                  required
-                  className="w-full px-3 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-hidden"
-                />
-              </div>
-            )}
-          </div>
 
-          {/* Status selector (Previsto vs Realizado) */}
-          <div>
-            <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Status da Transação</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setStatus('completed')}
-                className={`py-2 px-3 rounded-xl text-xs font-medium border flex items-center justify-center gap-1.5 transition-all ${
-                  status === 'completed'
-                    ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-semibold'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                <Check className="w-3.5 h-3.5" /> Realizado (Já pago)
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatus('planned')}
-                className={`py-2 px-3 rounded-xl text-xs font-medium border flex items-center justify-center gap-1.5 transition-all ${
-                  status === 'planned'
-                    ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 text-amber-600 dark:text-amber-400 font-semibold'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
-                }`}
-              >
-                Previsto (A vencer)
-              </button>
+              {type === 'transfer' ? (
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Conta de Destino</label>
+                  <select
+                    value={destinationAccountId}
+                    onChange={e => setDestinationAccountId(e.target.value)}
+                    required
+                    className="w-full px-3 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-hidden"
+                  >
+                    <option value="">Selecione o destino...</option>
+                    {accounts.filter(a => a.id !== accountId).map(acc => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} (R$ {acc.current_balance?.toFixed(2)})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Data</label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={e => setDate(e.target.value)}
+                    required
+                    className="w-full px-3 py-2.5 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-hidden"
+                  />
+                </div>
+              )}
             </div>
-          </div>
+          )}
+
+          {/* Status selector (Previsto vs Realizado) - shown for standard bank transactions */}
+          {paymentMethod === 'bank' && (
+            <div>
+              <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Status da Transação</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setStatus('completed')}
+                  className={`py-2 px-3 rounded-xl text-xs font-medium border flex items-center justify-center gap-1.5 transition-all ${
+                    status === 'completed'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-600 dark:text-emerald-400 font-semibold'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  <Check className="w-3.5 h-3.5" /> Realizado (Já pago)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatus('planned')}
+                  className={`py-2 px-3 rounded-xl text-xs font-medium border flex items-center justify-center gap-1.5 transition-all ${
+                    status === 'planned'
+                      ? 'bg-amber-50 dark:bg-amber-950/40 border-amber-500 text-amber-600 dark:text-amber-400 font-semibold'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  Previsto (A vencer)
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Submit */}
           <div className="pt-2">

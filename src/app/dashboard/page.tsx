@@ -9,11 +9,12 @@ import { EvolutionChart } from '@/components/dashboard/EvolutionChart';
 import { CategoryExpenseChart } from '@/components/dashboard/CategoryExpenseChart';
 import { PlanningSummaryWidget } from '@/components/dashboard/PlanningSummaryWidget';
 import { DynamicIcon } from '@/components/ui/Icon';
+import { getInvoicePeriodForPurchase, determineInvoiceStatus } from '@/lib/creditCardEngine';
 import { ArrowRight, CheckCircle2, Clock, CreditCard as CardIcon } from 'lucide-react';
 
 export default function DashboardPage() {
   const { 
-    transactions, categories, accounts, creditCards, 
+    transactions, categories, accounts, creditCards, cardPurchases, cardPayments,
     selectedYear, selectedMonth, updateTransaction 
   } = useFinance();
 
@@ -24,6 +25,12 @@ export default function DashboardPage() {
 
   const formatBRL = (val: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
+  };
+
+  const formatDateBR = (dateStr: string) => {
+    if (!dateStr || !dateStr.includes('-')) return dateStr;
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
   };
 
   return (
@@ -37,15 +44,15 @@ export default function DashboardPage() {
       {/* Planning & Daily Suggested Limit Banner */}
       <PlanningSummaryWidget />
 
-      {/* Credit Cards Summary Widget */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 rounded-3xl shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+      {/* Credit Cards Current Invoice Summary Widget */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 rounded-3xl shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <CardIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              Cartões de Crédito
+              Fatura Atual dos Cartões ({selectedMonth}/{selectedYear})
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Limites e obrigações de faturas</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Resumo de faturas, vencimentos e limites</p>
           </div>
           <Link
             href="/dashboard/cartoes"
@@ -55,29 +62,72 @@ export default function DashboardPage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-          {creditCards.map(card => (
-            <div key={card.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-bold text-sm text-slate-900 dark:text-white">{card.name}</h4>
-                  <span className="text-[10px] text-slate-400">Vencimento Dia {card.due_day}</span>
-                </div>
-                <CardIcon className="w-5 h-5 text-indigo-500" />
-              </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {creditCards.map(card => {
+            const cardPurchasesList = cardPurchases.filter(p => p.credit_card_id === card.id);
+            const currentInvoicePurchases = cardPurchasesList.filter(p => {
+              const invPeriod = getInvoicePeriodForPurchase(p.purchase_date, card.closing_day, card.due_day);
+              return invPeriod.month === selectedMonth && invPeriod.year === selectedYear;
+            });
 
-              <div className="space-y-1 pt-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Comprometido:</span>
-                  <span className="font-bold text-rose-600 dark:text-rose-400">{formatBRL(card.committed_limit || 0)}</span>
+            const invoiceTotal = currentInvoicePurchases.reduce((acc, p) => acc + (Number(p.installment_amount) || 0), 0);
+            
+            const invoicePayments = cardPayments.filter(pay => {
+              return pay.invoice_id === `inv-${card.id}-${selectedYear}-${selectedMonth}`;
+            });
+            const paidAmount = invoicePayments.reduce((acc, pay) => acc + (Number(pay.amount) || 0), 0);
+
+            const invPeriod = getInvoicePeriodForPurchase(
+              `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`, 
+              card.closing_day, 
+              card.due_day
+            );
+
+            const status = determineInvoiceStatus(invoiceTotal, paidAmount, invPeriod.dueDate);
+
+            return (
+              <div key={card.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-white">{card.name}</h4>
+                    <span className="text-[10px] text-slate-400 font-medium">•••• {card.last_four_digits}</span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                    status === 'paid'
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                      : status === 'partially_paid'
+                      ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'
+                      : status === 'overdue'
+                      ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                      : 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                  }`}>
+                    {status === 'paid' ? 'Paga' : status === 'partially_paid' ? 'Parcial' : status === 'overdue' ? 'Vencida' : 'Aberta'}
+                  </span>
                 </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Disponível:</span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400">{formatBRL(card.available_limit || 0)}</span>
+
+                <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                  <span className="text-[11px] text-slate-400 font-medium block mb-0.5">Fatura Atual ({selectedMonth}/{selectedYear})</span>
+                  <span className="text-xl font-black text-slate-900 dark:text-white block">{formatBRL(invoiceTotal)}</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 block">Fechamento:</span>
+                    <strong className="text-slate-700 dark:text-slate-300">{formatDateBR(invPeriod.closingDate)}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block">Vencimento:</span>
+                    <strong className="text-slate-700 dark:text-slate-300">{formatDateBR(invPeriod.dueDate)}</strong>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200/50 dark:border-slate-700/50 flex justify-between text-[11px]">
+                  <span>Limite Disponível:</span>
+                  <strong className="text-emerald-600 dark:text-emerald-400">{formatBRL(card.available_limit || 0)}</strong>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -130,7 +180,7 @@ export default function DashboardPage() {
                         {tx.description}
                       </p>
                       <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        <span>{tx.date}</span>
+                        <span>{formatDateBR(tx.date)}</span>
                         <span>•</span>
                         <span>{account?.name || 'Conta'}</span>
                         <span>•</span>
