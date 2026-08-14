@@ -1,22 +1,32 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useFinance } from '@/context/FinanceContext';
 import { MonthlySelector } from '@/components/layout/MonthlySelector';
 import { SummaryCards } from '@/components/dashboard/SummaryCards';
 import { EvolutionChart } from '@/components/dashboard/EvolutionChart';
 import { CategoryExpenseChart } from '@/components/dashboard/CategoryExpenseChart';
 import { PlanningSummaryWidget } from '@/components/dashboard/PlanningSummaryWidget';
+import { OnboardingChecklistWidget } from '@/components/dashboard/OnboardingChecklistWidget';
 import { DynamicIcon } from '@/components/ui/Icon';
 import { getInvoicePeriodForPurchase, determineInvoiceStatus } from '@/lib/creditCardEngine';
 import { ArrowRight, CheckCircle2, Clock, CreditCard as CardIcon } from 'lucide-react';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { 
-    transactions, categories, accounts, creditCards, cardPurchases, cardPayments,
+    user, transactions, categories, accounts, creditCards, cardPurchases, cardPayments,
     selectedYear, selectedMonth, updateTransaction 
   } = useFinance();
+
+  // Redirect to /onboarding if user hasn't completed setup
+  useEffect(() => {
+    if (user && user.onboarding_completed === false) {
+      router.replace('/onboarding');
+    }
+  }, [user, router]);
 
   const monthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
   const recentTransactions = transactions
@@ -35,6 +45,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6 max-w-full overflow-x-hidden">
+      {/* Post-Onboarding Progress Checklist Widget */}
+      <OnboardingChecklistWidget />
+
       {/* Top Controls: Monthly Selector */}
       <MonthlySelector />
 

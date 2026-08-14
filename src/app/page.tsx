@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useFinance } from '@/context/FinanceContext';
 import { 
   Wallet, ShieldCheck, Users, CreditCard, Target, Landmark, 
-  ArrowRight, CheckCircle2, Sun, Moon, PiggyBank, HeartHandshake, Smile 
+  ArrowRight, CheckCircle2, Sun, Moon, PiggyBank, HeartHandshake 
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -62,11 +62,6 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="px-4 sm:px-8 py-14 sm:py-20 max-w-5xl mx-auto text-center space-y-8">
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300 text-xs font-bold shadow-xs">
-          <Smile className="w-4 h-4" />
-          <span>Simples de usar • Sem termos difíceis • Tudo no seu ritmo</span>
-        </div>
-
         <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight max-w-4xl mx-auto">
           Nunca mais gaste mais do que você ganha.
         </h1>

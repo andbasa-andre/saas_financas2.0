@@ -17,6 +17,10 @@ export interface Profile {
     theme: 'light' | 'dark' | 'system';
     currency: string;
   };
+  onboarding_completed?: boolean;
+  onboarding_step?: number;
+  financial_goals?: string[];
+  show_onboarding_checklist?: boolean;
   created_at: string;
 }
 

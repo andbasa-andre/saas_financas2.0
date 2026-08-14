@@ -48,6 +48,11 @@ interface FinanceContextType {
   logout: () => void;
   updateProfile: (data: Partial<Profile>) => void;
 
+  // Onboarding Methods
+  updateOnboardingStep: (step: number, goals?: string[]) => void;
+  completeOnboarding: () => void;
+  hideOnboardingChecklist: () => void;
+
   // Family Account & Member methods
   createWhatsAppInvite: (phone: string, invitedName?: string) => string;
   acceptInviteToken: (token: string) => Promise<boolean>;
@@ -138,6 +143,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
             name: session.user.user_metadata?.name || 'Usuário',
             email: session.user.email || '',
             preferences: { theme: 'system', currency: 'BRL' },
+            onboarding_completed: session.user.user_metadata?.onboarding_completed ?? false,
+            onboarding_step: session.user.user_metadata?.onboarding_step ?? 1,
+            show_onboarding_checklist: true,
             created_at: session.user.created_at
           };
           setUser(profile);
@@ -242,6 +250,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         name: data.user.user_metadata?.name || 'Usuário',
         email: data.user.email || '',
         preferences: { theme: 'system', currency: 'BRL' },
+        onboarding_completed: data.user.user_metadata?.onboarding_completed ?? false,
+        onboarding_step: data.user.user_metadata?.onboarding_step ?? 1,
+        show_onboarding_checklist: true,
         created_at: data.user.created_at
       };
       setUser(profile);
@@ -253,6 +264,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         name: email.split('@')[0] || 'Usuário',
         email: email,
         preferences: { theme: 'system', currency: 'BRL' },
+        onboarding_completed: true,
+        onboarding_step: 8,
+        show_onboarding_checklist: true,
         created_at: new Date().toISOString()
       };
       setLocalUser(mockProfile);
@@ -268,7 +282,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       const { data, error } = await supabase.auth.signUp({
         email,
         password: pass,
-        options: { data: { name } }
+        options: { data: { name, onboarding_completed: false, onboarding_step: 1 } }
       });
       if (error || !data.user) return false;
       const profile: Profile = {
@@ -276,6 +290,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         name,
         email,
         preferences: { theme: 'system', currency: 'BRL' },
+        onboarding_completed: false,
+        onboarding_step: 1,
+        show_onboarding_checklist: true,
         created_at: data.user.created_at
       };
       setUser(profile);
@@ -288,6 +305,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         name,
         email,
         preferences: { theme: 'system', currency: 'BRL' },
+        onboarding_completed: false,
+        onboarding_step: 1,
+        show_onboarding_checklist: true,
         created_at: new Date().toISOString()
       };
       setLocalUser(mockProfile);
@@ -312,6 +332,52 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const updateProfile = (data: Partial<Profile>) => {
     if (!user) return;
     const updated = { ...user, ...data };
+    setUser(updated);
+    setLocalUser(updated);
+  };
+
+  // Onboarding Methods
+  const updateOnboardingStep = (step: number, goals?: string[]) => {
+    if (!user) return;
+    const updated: Profile = {
+      ...user,
+      onboarding_step: step,
+      financial_goals: goals || user.financial_goals
+    };
+    setUser(updated);
+    setLocalUser(updated);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.auth.updateUser({
+        data: { onboarding_step: step, financial_goals: goals || user.financial_goals }
+      });
+    }
+  };
+
+  const completeOnboarding = () => {
+    if (!user) return;
+    const updated: Profile = {
+      ...user,
+      onboarding_completed: true,
+      onboarding_step: 8,
+      show_onboarding_checklist: true
+    };
+    setUser(updated);
+    setLocalUser(updated);
+
+    if (isSupabaseConfigured && supabase) {
+      supabase.auth.updateUser({
+        data: { onboarding_completed: true, onboarding_step: 8 }
+      });
+    }
+  };
+
+  const hideOnboardingChecklist = () => {
+    if (!user) return;
+    const updated: Profile = {
+      ...user,
+      show_onboarding_checklist: false
+    };
     setUser(updated);
     setLocalUser(updated);
   };
@@ -731,6 +797,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       signup,
       logout,
       updateProfile,
+      updateOnboardingStep,
+      completeOnboarding,
+      hideOnboardingChecklist,
       createWhatsAppInvite,
       acceptInviteToken,
       removeMember,
