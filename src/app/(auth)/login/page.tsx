@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useFinance } from '@/context/FinanceContext';
-import { Wallet, Mail, Lock, ArrowRight } from 'lucide-react';
+import { Wallet, Mail, Lock, ArrowRight, ArrowLeft } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useFinance();
@@ -35,21 +35,31 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
       <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl p-8 shadow-xl">
+        {/* Back Button */}
+        <div className="mb-6">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" /> Voltar para a página inicial
+          </Link>
+        </div>
+
         {/* Brand */}
-        <div className="flex flex-col items-center mb-8">
+        <div className="flex flex-col items-center mb-8 text-center">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20 mb-3">
             <Wallet className="w-7 h-7" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Acessar Conta</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Acessar sua Conta</h1>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Seu controle financeiro simples, rápido e privado
+            Seu controle financeiro pessoal e familiar de forma simples
           </p>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-600 dark:text-rose-400 text-center">
+          <div className="mb-4 p-3 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-xs text-rose-600 dark:text-rose-400 text-center font-semibold">
             {errorMsg}
           </div>
         )}
@@ -93,7 +103,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
+            className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
           >
             {isSubmitting ? 'Entrando...' : 'Entrar na Conta'}
             <ArrowRight className="w-4 h-4" />

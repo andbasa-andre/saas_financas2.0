@@ -45,14 +45,14 @@ export default function ReportsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">Relatórios & Exportação</h2>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Analise seu fluxo de caixa e exporte seus relatórios em CSV</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Veja o resumo do seu dinheiro e baixe sua planilha em CSV</p>
         </div>
 
         <button
           onClick={exportCSV}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-md transition-all self-start sm:self-auto"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-md transition-all self-start sm:self-auto cursor-pointer"
         >
-          <Download className="w-4 h-4" /> Exportar CSV
+          <Download className="w-4 h-4" /> Baixar Planilha CSV
         </button>
       </div>
 
@@ -62,34 +62,34 @@ export default function ReportsPage() {
       <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-6 rounded-3xl shadow-sm space-y-4">
         <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
           <FileSpreadsheet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-          Demonstrativo de Resultado do Período
+          Resumo de Entradas e Saídas do Mês
         </h3>
 
         <div className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
           <div className="py-3 flex justify-between">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">Receitas Realizadas</span>
+            <span className="font-semibold text-slate-700 dark:text-slate-300">Tudo o que você recebeu (Receitas)</span>
             <span className="font-bold text-teal-600 dark:text-teal-400">{formatBRL(summary.monthIncomeCompleted)}</span>
           </div>
           <div className="py-3 flex justify-between">
-            <span className="font-semibold text-slate-700 dark:text-slate-300">Despesas Realizadas</span>
+            <span className="font-semibold text-slate-700 dark:text-slate-300">Tudo o que você pagou (Despesas)</span>
             <span className="font-bold text-rose-600 dark:text-rose-400">- {formatBRL(summary.monthExpenseCompleted)}</span>
           </div>
           <div className="py-3 flex justify-between text-base font-black border-t border-slate-200 dark:border-slate-700">
-            <span className="text-slate-900 dark:text-white">Resultado Operacional</span>
+            <span className="text-slate-900 dark:text-white">Sobra do Mês (O que sobrou para guardar)</span>
             <span className={summary.monthResultCompleted >= 0 ? 'text-blue-600 dark:text-blue-400' : 'text-amber-600 dark:text-amber-400'}>
               {formatBRL(summary.monthResultCompleted)}
             </span>
           </div>
           <div className="py-3 flex justify-between text-xs text-slate-500">
-            <span>Receitas Previstas Restantes</span>
+            <span>Ainda para receber neste mês</span>
             <span>+ {formatBRL(summary.monthIncomePlanned)}</span>
           </div>
           <div className="py-3 flex justify-between text-xs text-slate-500">
-            <span>Despesas Previstas Restantes</span>
+            <span>Ainda para pagar neste mês</span>
             <span>- {formatBRL(summary.monthExpensePlanned)}</span>
           </div>
           <div className="py-3 flex justify-between text-sm font-bold text-emerald-700 dark:text-emerald-400">
-            <span>Saldo Projetado para o Final do Mês</span>
+            <span>Dinheiro estimado no final do mês</span>
             <span>{formatBRL(summary.projectedBalance)}</span>
           </div>
         </div>

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useFinance } from '@/context/FinanceContext';
 import { 
   Wallet, ShieldCheck, Users, CreditCard, Target, Landmark, 
-  ArrowRight, CheckCircle2, Sun, Moon, Sparkles, PieChart, Lock 
+  ArrowRight, CheckCircle2, Sun, Moon, PiggyBank, HeartHandshake, Smile 
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -30,7 +30,7 @@ export default function LandingPage() {
           <div>
             <span className="text-lg font-black text-slate-900 dark:text-white tracking-tight">Finanças 2.0</span>
             <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-full ml-2">
-              Pessoal & Familiar
+              Para você e sua família
             </span>
           </div>
         </div>
@@ -61,21 +61,21 @@ export default function LandingPage() {
       </header>
 
       {/* Hero Section */}
-      <section className="px-4 sm:px-8 py-16 sm:py-24 max-w-6xl mx-auto text-center space-y-8">
+      <section className="px-4 sm:px-8 py-14 sm:py-20 max-w-5xl mx-auto text-center space-y-8">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/80 text-emerald-700 dark:text-emerald-300 text-xs font-bold shadow-xs">
-          <Users className="w-4 h-4" />
-          <span>Nova Funcionalidade: Contas Familiares Compartilhadas com WhatsApp</span>
+          <Smile className="w-4 h-4" />
+          <span>Simples de usar • Sem termos difíceis • Tudo no seu ritmo</span>
         </div>
 
         <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-tight max-w-4xl mx-auto">
-          O controle financeiro pessoal e familiar que você sempre quis.
+          Nunca mais gaste mais do que você ganha.
         </h1>
 
         <p className="text-base sm:text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto leading-relaxed font-normal">
-          Substitua planilhas complexas por uma ferramenta rápida, bonita e transparente. Saiba exatamente quanto tem hoje, quanto vai gastar e quanto pode usar por dia sem comprometer seu mês.
+          Esqueça planilhas complicadas e contas confusas. Organize o dinheiro da sua casa com facilidade, saiba exatamente quanto pode gastar hoje e durma com a mente tranquila.
         </p>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
           <Link
             href="/register"
             className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-base shadow-xl shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
@@ -87,27 +87,46 @@ export default function LandingPage() {
             href="/login"
             className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white font-bold text-base shadow-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-center"
           >
-            Já tenho uma conta
+            Fazer Login
           </Link>
         </div>
 
-        {/* Badges checklist */}
+        {/* Simple Promises */}
         <div className="flex flex-wrap items-center justify-center gap-6 text-xs sm:text-sm font-semibold text-slate-500 dark:text-slate-400 pt-4">
-          <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Sem cartões de crédito exigidos</span>
-          <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Supabase RLS 100% Seguro</span>
-          <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Convites instantâneos no WhatsApp</span>
+          <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> 100% Grátis para começar</span>
+          <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Convide sua família pelo WhatsApp</span>
+          <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> Seus dados seguros e protegidos</span>
         </div>
       </section>
 
-      {/* Feature Grid */}
-      <section className="px-4 sm:px-8 py-16 bg-white dark:bg-slate-900/50 border-y border-slate-200/80 dark:border-slate-800/80">
-        <div className="max-w-6xl mx-auto space-y-12">
+      {/* Golden Rule Highlight Card */}
+      <section className="px-4 sm:px-8 py-6 max-w-4xl mx-auto w-full">
+        <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-xl shadow-emerald-600/20 space-y-3 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div className="space-y-1">
+            <span className="text-xs font-extrabold uppercase tracking-widest text-emerald-200">A Regra de Ouro</span>
+            <h2 className="text-xl sm:text-2xl font-black">"Gaste menos do que recebe e guarde a diferença."</h2>
+            <p className="text-xs sm:text-sm text-emerald-100 opacity-90">
+              O sistema calcula automaticamente o quanto sobrou no mês para você economizar sem sofrimento.
+            </p>
+          </div>
+          <Link
+            href="/register"
+            className="px-6 py-3 rounded-2xl bg-white text-emerald-800 font-extrabold text-xs sm:text-sm shadow-md hover:bg-emerald-50 transition-colors shrink-0"
+          >
+            Quero Organizar Minhas Contas
+          </Link>
+        </div>
+      </section>
+
+      {/* Feature Grid with simple concepts */}
+      <section className="px-4 sm:px-8 py-16 bg-white dark:bg-slate-900/50 border-y border-slate-200/80 dark:border-slate-800/80 mt-12">
+        <div className="max-w-5xl mx-auto space-y-12">
           <div className="text-center space-y-3">
             <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
-              Tudo o que você precisa para dominar suas finanças
+              Feito para facilitar a sua vida
             </h2>
             <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400">
-              Desenvolvido com foco em velocidade, transparência total e simplicidade de uso.
+              Respostas claras e sem enrolação para o seu dia a dia financeiro.
             </p>
           </div>
 
@@ -117,9 +136,9 @@ export default function LandingPage() {
               <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                 <Users className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Conta Familiar Compartilhada</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Contas da Casa Compartilhadas</h3>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Compartilhe o acesso financeiro com seu cônjuge com transparência total. Todos os membros enxergam as mesmas contas, cartões e lançamentos sem dados escondidos.
+                Convide seu parceiro ou parceira pelo WhatsApp. Todo mundo vê os mesmos lançamentos da casa com total clareza e sem segredos.
               </p>
             </div>
 
@@ -128,9 +147,9 @@ export default function LandingPage() {
               <div className="w-12 h-12 rounded-2xl bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
                 <CreditCard className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Gestão de Cartões & Faturas</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Cartões e Faturas sob Controle</h3>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Controle compras parceladas em até 24x, limite comprometido vs. disponível, faturas abertas e liquidação sem duplicação de despesas no extrato.
+                Saiba exatamente quanto vai vir na próxima fatura, acompanhe as parcelas das compras e veja quanto limite ainda tem para usar.
               </p>
             </div>
 
@@ -139,42 +158,42 @@ export default function LandingPage() {
               <div className="w-12 h-12 rounded-2xl bg-teal-100 dark:bg-teal-950/60 text-teal-600 dark:text-teal-400 flex items-center justify-center">
                 <Target className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Teto Diário Sugerido</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Limite do Dia</h3>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Saiba exatamente qual o valor médio diário que você pode gastar nos dias restantes do mês sem estourar seu orçamento planejado.
+                Descubra qual o valor médio diário que você pode gastar hoje sem estourar o dinheiro que reservou para o restante do mês.
               </p>
             </div>
 
             {/* Feature 4 */}
             <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60 space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center">
-                <Landmark className="w-6 h-6" />
+                <PiggyBank className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Patrimônio Líquido em Tempo Real</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Reserva e Bens</h3>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Acompanhe o cálculo contínuo de Ativos (contas, veículos, investimentos) menos Passivos (financiamentos e obrigações de cartão) com gráficos evolutivos.
+                Acompanhe o crescimento da sua poupança, investimentos e bens (como carro ou imóvel) descontando dívidas e financiamentos.
               </p>
             </div>
 
             {/* Feature 5 */}
             <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60 space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                <PieChart className="w-6 h-6" />
+                <HeartHandshake className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Relatórios & DRE Financeiro</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Entradas e Saídas Claras</h3>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Visualização clara de saídas por categoria, receitas, resultado mensal e exportação de relatórios em CSV com um único clique.
+                Saiba exatamente de onde veio seu dinheiro (salários, extras) e para onde ele foi (mercado, contas de água e luz, lazer).
               </p>
             </div>
 
             {/* Feature 6 */}
             <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/60 dark:border-slate-700/60 space-y-3">
               <div className="w-12 h-12 rounded-2xl bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 flex items-center justify-center">
-                <Lock className="w-6 h-6" />
+                <ShieldCheck className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Privacidade & Isolamento RLS</h3>
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white">Segurança e Privacidade</h3>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Arquitetura PostgreSQL com Supabase Row Level Security (RLS). Nenhuma pessoa fora da sua conta consegue acessar seus dados financeiros.
+                Seus dados financeiros são exclusivamente seus. Apenas você e as pessoas que você convidar têm acesso às informações.
               </p>
             </div>
           </div>
@@ -184,10 +203,10 @@ export default function LandingPage() {
       {/* CTA Footer Section */}
       <section className="px-4 sm:px-8 py-20 max-w-4xl mx-auto text-center space-y-6">
         <h2 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white">
-          Pronto para organizar suas finanças de forma simples?
+          Pronto para ter paz com o seu dinheiro?
         </h2>
         <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 max-w-xl mx-auto">
-          Crie sua conta agora mesmo e convide sua família em menos de 2 minutos.
+          Crie sua conta em menos de 1 minuto e comece a controlar suas finanças hoje mesmo.
         </p>
 
         <div className="pt-2">
@@ -202,7 +221,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="mt-auto border-t border-slate-200/80 dark:border-slate-800 py-6 px-4 text-center text-xs text-slate-500 dark:text-slate-400">
-        <p>© 2026 Finanças 2.0 — Controle Financeiro Pessoal & Familiar Multi-usuário</p>
+        <p>© 2026 Finanças 2.0 — Controle Financeiro Pessoal e Familiar</p>
       </footer>
     </div>
   );
