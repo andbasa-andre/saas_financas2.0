@@ -2,30 +2,19 @@
 
 import React from 'react';
 import { useFinance } from '@/context/FinanceContext';
-import { Plus, Sun, Moon, LogOut, Wallet, Menu } from 'lucide-react';
+import { Plus, Sun, Moon, LogOut, Wallet } from 'lucide-react';
 
 interface HeaderProps {
   onOpenQuickModal: () => void;
-  onToggleSidebar?: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ onOpenQuickModal, onToggleSidebar }) => {
+export const Header: React.FC<HeaderProps> = ({ onOpenQuickModal }) => {
   const { user, theme, toggleTheme, logout } = useFinance();
 
   return (
-    <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 py-3.5 flex items-center justify-between">
-      {/* Brand, Sidebar Toggle & Greeting */}
+    <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-8 py-3 flex items-center justify-between">
+      {/* Brand & Greeting */}
       <div className="flex items-center gap-3">
-        {onToggleSidebar && (
-          <button
-            onClick={onToggleSidebar}
-            className="p-2 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-            title="Alternar Menu Lateral"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-        )}
-
         <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
           <Wallet className="w-5 h-5" />
         </div>
