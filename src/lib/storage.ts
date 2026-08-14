@@ -1,7 +1,7 @@
 import { 
   Account, Category, Transaction, Budget, Asset, Liability, 
   CreditCard, CreditCardInvoice, CreditCardPurchase, CreditCardPayment, 
-  NetWorthSnapshot, Profile 
+  NetWorthSnapshot, Profile, FinancialAccount, AccountMember, AccountInvite 
 } from '@/types/finance';
 
 const STORAGE_KEYS = {
@@ -17,10 +17,14 @@ const STORAGE_KEYS = {
   CREDIT_CARD_INVOICES: 'fin_card_invoices',
   CREDIT_CARD_PURCHASES: 'fin_card_purchases',
   CREDIT_CARD_PAYMENTS: 'fin_card_payments',
-  NET_WORTH_SNAPSHOTS: 'fin_snapshots'
+  NET_WORTH_SNAPSHOTS: 'fin_snapshots',
+  FINANCIAL_ACCOUNTS: 'fin_family_accounts',
+  ACCOUNT_MEMBERS: 'fin_account_members',
+  ACCOUNT_INVITES: 'fin_account_invites'
 };
 
 const DEFAULT_USER_ID = 'demo-user-123';
+const DEFAULT_FINANCIAL_ACCOUNT_ID = 'fa-fam-123';
 
 const DEFAULT_CATEGORIES: Omit<Category, 'id' | 'user_id'>[] = [
   // Income
@@ -84,15 +88,63 @@ export function setLocalUser(profile: Profile | null): void {
 export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
   if (typeof window === 'undefined') return;
 
+  // Financial Accounts
+  const existingFinAccounts = getItem<FinancialAccount[]>(STORAGE_KEYS.FINANCIAL_ACCOUNTS, []);
+  let userFinAccounts = existingFinAccounts;
+
+  if (userFinAccounts.length === 0) {
+    const defaultAccount: FinancialAccount = {
+      id: DEFAULT_FINANCIAL_ACCOUNT_ID,
+      name: 'Família Silva',
+      owner_id: userId,
+      created_at: new Date().toISOString()
+    };
+    userFinAccounts = [defaultAccount];
+    setItem(STORAGE_KEYS.FINANCIAL_ACCOUNTS, userFinAccounts);
+  }
+
+  const finAccId = userFinAccounts[0]?.id || DEFAULT_FINANCIAL_ACCOUNT_ID;
+
+  // Account Members
+  const existingMembers = getItem<AccountMember[]>(STORAGE_KEYS.ACCOUNT_MEMBERS, []);
+  let userMembers = existingMembers.filter(m => m.financial_account_id === finAccId);
+
+  if (userMembers.length === 0) {
+    userMembers = [
+      {
+        id: `mem-${userId}-1`,
+        financial_account_id: finAccId,
+        user_id: userId,
+        role: 'owner',
+        status: 'active',
+        user_name: 'Carlos Silva',
+        user_email: 'carlos@exemplo.com',
+        created_at: new Date().toISOString()
+      },
+      {
+        id: `mem-wife-2`,
+        financial_account_id: finAccId,
+        user_id: 'user-wife-456',
+        role: 'member',
+        status: 'active',
+        user_name: 'Jaqueline Silva',
+        user_email: 'jaqueline@exemplo.com',
+        created_at: new Date().toISOString()
+      }
+    ];
+    setItem(STORAGE_KEYS.ACCOUNT_MEMBERS, [...existingMembers, ...userMembers]);
+  }
+
   // Categories
   const existingCategories = getItem<Category[]>(STORAGE_KEYS.CATEGORIES, []);
-  let userCategories = existingCategories.filter(c => c.user_id === userId);
+  let userCategories = existingCategories.filter(c => c.financial_account_id === finAccId || c.user_id === userId);
 
   if (userCategories.length === 0) {
     userCategories = DEFAULT_CATEGORIES.map((cat, idx) => ({
       ...cat,
       id: `cat-${userId}-${idx + 1}`,
       user_id: userId,
+      financial_account_id: finAccId,
       created_at: new Date().toISOString()
     }));
     setItem(STORAGE_KEYS.CATEGORIES, [...existingCategories, ...userCategories]);
@@ -100,13 +152,15 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
 
   // Accounts
   const existingAccounts = getItem<Account[]>(STORAGE_KEYS.ACCOUNTS, []);
-  let userAccounts = existingAccounts.filter(a => a.user_id === userId);
+  let userAccounts = existingAccounts.filter(a => a.financial_account_id === finAccId || a.user_id === userId);
 
   if (userAccounts.length === 0) {
     userAccounts = [
       {
         id: `acc-${userId}-1`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: userId,
         name: 'Conta Corrente (Itaú)',
         type: 'checking',
         initial_balance: 5200.00,
@@ -118,6 +172,8 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
       {
         id: `acc-${userId}-2`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: userId,
         name: 'Reserva de Emergência',
         type: 'savings',
         initial_balance: 18500.00,
@@ -129,6 +185,8 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
       {
         id: `acc-${userId}-3`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: userId,
         name: 'Investimentos XP',
         type: 'investment',
         initial_balance: 34000.00,
@@ -140,6 +198,8 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
       {
         id: `acc-${userId}-4`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: userId,
         name: 'Carteira (Dinheiro)',
         type: 'cash',
         initial_balance: 350.00,
@@ -153,13 +213,15 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
 
   // Credit Cards
   const existingCards = getItem<CreditCard[]>(STORAGE_KEYS.CREDIT_CARDS, []);
-  let userCards = existingCards.filter(c => c.user_id === userId);
+  let userCards = existingCards.filter(c => c.financial_account_id === finAccId || c.user_id === userId);
 
   if (userCards.length === 0) {
     userCards = [
       {
         id: `card-${userId}-1`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: userId,
         name: 'Nubank Violeta',
         issuer: 'Nubank',
         last_four_digits: '1234',
@@ -174,6 +236,8 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
       {
         id: `card-${userId}-2`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: userId,
         name: 'Itaú Personalité',
         issuer: 'Itaú',
         last_four_digits: '5678',
@@ -191,7 +255,7 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
 
   // Credit Card Purchases
   const existingPurchases = getItem<CreditCardPurchase[]>(STORAGE_KEYS.CREDIT_CARD_PURCHASES, []);
-  let userPurchases = existingPurchases.filter(p => p.user_id === userId);
+  let userPurchases = existingPurchases.filter(p => p.financial_account_id === finAccId || p.user_id === userId);
 
   if (userPurchases.length === 0) {
     const eletrCat = userCategories.find(c => c.name === 'Compras & Vestuário')?.id;
@@ -200,13 +264,16 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
 
     // Sample 12x installment purchase: Notebook R$ 3600 (12x de R$ 300)
     for (let i = 1; i <= 12; i++) {
-      const d = new Date(2026, 7 + (i - 1), 6); // Month 8 to Month 19
+      const d = new Date(2026, 7 + (i - 1), 6);
       const monthStr = String(d.getMonth() + 1).padStart(2, '0');
       const yearStr = d.getFullYear();
 
       userPurchases.push({
         id: `pur-${userId}-nb-${i}`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: userId,
+        created_by_name: 'Carlos Silva',
         credit_card_id: `card-${userId}-1`,
         category_id: eletrCat,
         description: `Notebook Dell Inspiron (${i}/12)`,
@@ -223,6 +290,9 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
       {
         id: `pur-${userId}-1`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: userId,
+        created_by_name: 'Carlos Silva',
         credit_card_id: `card-${userId}-1`,
         category_id: marketCat,
         description: 'Supermercado Carrefour',
@@ -235,6 +305,9 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
       {
         id: `pur-${userId}-2`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: 'user-wife-456',
+        created_by_name: 'Jaqueline Silva',
         credit_card_id: `card-${userId}-1`,
         category_id: uberCat,
         description: 'Uber Reunião',
@@ -251,7 +324,7 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
 
   // Sample Transactions for current month (2026-08)
   const existingTransactions = getItem<Transaction[]>(STORAGE_KEYS.TRANSACTIONS, []);
-  let userTransactions = existingTransactions.filter(t => t.user_id === userId);
+  let userTransactions = existingTransactions.filter(t => t.financial_account_id === finAccId || t.user_id === userId);
 
   if (userTransactions.length === 0) {
     const salaryCat = userCategories.find(c => c.name === 'Salário')?.id;
@@ -263,6 +336,9 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
       {
         id: `tx-${userId}-1`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: userId,
+        created_by_name: 'Carlos Silva',
         account_id: `acc-${userId}-1`,
         category_id: salaryCat,
         description: 'Salário Mensal Tech Corp',
@@ -275,6 +351,9 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
       {
         id: `tx-${userId}-2`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: 'user-wife-456',
+        created_by_name: 'Jaqueline Silva',
         account_id: `acc-${userId}-1`,
         category_id: rentCat,
         description: 'Aluguel do Apê',
@@ -287,6 +366,9 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
       {
         id: `tx-${userId}-5`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: userId,
+        created_by_name: 'Carlos Silva',
         account_id: `acc-${userId}-1`,
         category_id: energyCat,
         description: 'Conta de Luz Enel',
@@ -299,6 +381,9 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
       {
         id: `tx-${userId}-6`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: 'user-wife-456',
+        created_by_name: 'Jaqueline Silva',
         account_id: `acc-${userId}-1`,
         category_id: netCat,
         description: 'Internet Fibra 500MB',
@@ -314,13 +399,15 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
 
   // Assets
   const existingAssets = getItem<Asset[]>(STORAGE_KEYS.ASSETS, []);
-  let userAssets = existingAssets.filter(a => a.user_id === userId);
+  let userAssets = existingAssets.filter(a => a.financial_account_id === finAccId || a.user_id === userId);
 
   if (userAssets.length === 0) {
     userAssets = [
       {
         id: `asset-${userId}-1`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: userId,
         name: 'Veículo Honda Civic 2021',
         type: 'vehicle',
         current_value: 92000.00,
@@ -329,6 +416,8 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
       {
         id: `asset-${userId}-2`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: userId,
         name: 'Fundos Imobiliários HGLG11',
         type: 'investment',
         current_value: 15400.00
@@ -339,13 +428,15 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
 
   // Liabilities
   const existingLiabilities = getItem<Liability[]>(STORAGE_KEYS.LIABILITIES, []);
-  let userLiabilities = existingLiabilities.filter(l => l.user_id === userId);
+  let userLiabilities = existingLiabilities.filter(l => l.financial_account_id === finAccId || l.user_id === userId);
 
   if (userLiabilities.length === 0) {
     userLiabilities = [
       {
         id: `liab-${userId}-1`,
         user_id: userId,
+        financial_account_id: finAccId,
+        created_by: userId,
         name: 'Financiamento de Veículo',
         type: 'financing',
         current_value: 24500.00,
@@ -358,32 +449,32 @@ export function initializeSeedData(userId: string = DEFAULT_USER_ID) {
 
   // Budgets
   const existingBudgets = getItem<Budget[]>(STORAGE_KEYS.BUDGETS, []);
-  let userBudgets = existingBudgets.filter(b => b.user_id === userId);
+  let userBudgets = existingBudgets.filter(b => b.financial_account_id === finAccId || b.user_id === userId);
 
   if (userBudgets.length === 0) {
     const marketCat = userCategories.find(c => c.name === 'Supermercado')?.id;
     const uberCat = userCategories.find(c => c.name === 'Combustível & Transporte')?.id;
     const restCat = userCategories.find(c => c.name === 'Restaurante & Delivery')?.id;
 
-    if (marketCat) userBudgets.push({ id: `b-1`, user_id: userId, category_id: marketCat, month: 8, year: 2026, amount: 1500.00 });
-    if (uberCat) userBudgets.push({ id: `b-2`, user_id: userId, category_id: uberCat, month: 8, year: 2026, amount: 600.00 });
-    if (restCat) userBudgets.push({ id: `b-3`, user_id: userId, category_id: restCat, month: 8, year: 2026, amount: 800.00 });
+    if (marketCat) userBudgets.push({ id: `b-1`, user_id: userId, financial_account_id: finAccId, category_id: marketCat, month: 8, year: 2026, amount: 1500.00 });
+    if (uberCat) userBudgets.push({ id: `b-2`, user_id: userId, financial_account_id: finAccId, category_id: uberCat, month: 8, year: 2026, amount: 600.00 });
+    if (restCat) userBudgets.push({ id: `b-3`, user_id: userId, financial_account_id: finAccId, category_id: restCat, month: 8, year: 2026, amount: 800.00 });
 
     setItem(STORAGE_KEYS.BUDGETS, [...existingBudgets, ...userBudgets]);
   }
 
   // Net worth snapshots for history graph
   const existingSnapshots = getItem<NetWorthSnapshot[]>(STORAGE_KEYS.NET_WORTH_SNAPSHOTS, []);
-  let userSnapshots = existingSnapshots.filter(s => s.user_id === userId);
+  let userSnapshots = existingSnapshots.filter(s => s.financial_account_id === finAccId || s.user_id === userId);
 
   if (userSnapshots.length === 0) {
     userSnapshots = [
-      { id: `s-1`, user_id: userId, snapshot_date: '2026-03-01', total_assets: 125000, total_liabilities: 32000, net_worth: 93000 },
-      { id: `s-2`, user_id: userId, snapshot_date: '2026-04-01', total_assets: 128500, total_liabilities: 30500, net_worth: 98000 },
-      { id: `s-3`, user_id: userId, snapshot_date: '2026-05-01', total_assets: 132000, total_liabilities: 29000, net_worth: 103000 },
-      { id: `s-4`, user_id: userId, snapshot_date: '2026-06-01', total_assets: 136200, total_liabilities: 27500, net_worth: 108700 },
-      { id: `s-5`, user_id: userId, snapshot_date: '2026-07-01', total_assets: 141000, total_liabilities: 26000, net_worth: 115000 },
-      { id: `s-6`, user_id: userId, snapshot_date: '2026-08-01', total_assets: 147450, total_liabilities: 24500, net_worth: 122950 }
+      { id: `s-1`, user_id: userId, financial_account_id: finAccId, snapshot_date: '2026-03-01', total_assets: 125000, total_liabilities: 32000, net_worth: 93000 },
+      { id: `s-2`, user_id: userId, financial_account_id: finAccId, snapshot_date: '2026-04-01', total_assets: 128500, total_liabilities: 30500, net_worth: 98000 },
+      { id: `s-3`, user_id: userId, financial_account_id: finAccId, snapshot_date: '2026-05-01', total_assets: 132000, total_liabilities: 29000, net_worth: 103000 },
+      { id: `s-4`, user_id: userId, financial_account_id: finAccId, snapshot_date: '2026-06-01', total_assets: 136200, total_liabilities: 27500, net_worth: 108700 },
+      { id: `s-5`, user_id: userId, financial_account_id: finAccId, snapshot_date: '2026-07-01', total_assets: 141000, total_liabilities: 26000, net_worth: 115000 },
+      { id: `s-6`, user_id: userId, financial_account_id: finAccId, snapshot_date: '2026-08-01', total_assets: 147450, total_liabilities: 24500, net_worth: 122950 }
     ];
     setItem(STORAGE_KEYS.NET_WORTH_SNAPSHOTS, [...existingSnapshots, ...userSnapshots]);
   }

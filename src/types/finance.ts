@@ -5,11 +5,14 @@ export type AssetType = 'real_estate' | 'vehicle' | 'investment' | 'cash_equival
 export type LiabilityType = 'loan' | 'financing' | 'debt' | 'other';
 export type FrequencyType = 'daily' | 'weekly' | 'monthly' | 'yearly';
 export type InvoiceStatus = 'open' | 'closed' | 'paid' | 'partially_paid' | 'overdue';
+export type MemberRole = 'owner' | 'member';
+export type MemberStatus = 'active' | 'invited' | 'suspended';
 
 export interface Profile {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   preferences: {
     theme: 'light' | 'dark' | 'system';
     currency: string;
@@ -17,9 +20,41 @@ export interface Profile {
   created_at: string;
 }
 
+export interface FinancialAccount {
+  id: string;
+  name: string;
+  owner_id: string;
+  created_at: string;
+}
+
+export interface AccountMember {
+  id: string;
+  financial_account_id: string;
+  user_id: string;
+  role: MemberRole;
+  status: MemberStatus;
+  user_name?: string;
+  user_email?: string;
+  user_phone?: string;
+  created_at: string;
+}
+
+export interface AccountInvite {
+  id: string;
+  token: string;
+  financial_account_id: string;
+  created_by: string;
+  invited_name?: string;
+  invited_phone: string;
+  status: 'pending' | 'accepted' | 'expired' | 'canceled';
+  expires_at: string;
+  created_at: string;
+}
+
 export interface Category {
   id: string;
   user_id: string;
+  financial_account_id?: string;
   name: string;
   icon: string;
   color: string;
@@ -32,6 +67,8 @@ export interface Category {
 export interface Account {
   id: string;
   user_id: string;
+  financial_account_id?: string;
+  created_by?: string;
   name: string;
   type: AccountType;
   initial_balance: number;
@@ -46,6 +83,9 @@ export interface Account {
 export interface Transaction {
   id: string;
   user_id: string;
+  financial_account_id?: string;
+  created_by?: string;
+  created_by_name?: string;
   account_id?: string;
   destination_account_id?: string;
   credit_card_id?: string;
@@ -71,6 +111,8 @@ export interface Transaction {
 export interface RecurringTransaction {
   id: string;
   user_id: string;
+  financial_account_id?: string;
+  created_by?: string;
   account_id: string;
   category_id: string;
   description: string;
@@ -86,6 +128,8 @@ export interface RecurringTransaction {
 export interface CreditCard {
   id: string;
   user_id: string;
+  financial_account_id?: string;
+  created_by?: string;
   account_id?: string; // Conta padrão para pagamento
   name: string;
   issuer: string;
@@ -104,6 +148,7 @@ export interface CreditCard {
 export interface CreditCardInvoice {
   id: string;
   user_id: string;
+  financial_account_id?: string;
   credit_card_id: string;
   month: number;
   year: number;
@@ -120,6 +165,9 @@ export interface CreditCardInvoice {
 export interface CreditCardPurchase {
   id: string;
   user_id: string;
+  financial_account_id?: string;
+  created_by?: string;
+  created_by_name?: string;
   credit_card_id: string;
   invoice_id?: string;
   transaction_id?: string;
@@ -137,6 +185,8 @@ export interface CreditCardPurchase {
 export interface CreditCardPayment {
   id: string;
   user_id: string;
+  financial_account_id?: string;
+  created_by?: string;
   invoice_id: string;
   account_id: string;
   amount: number;
@@ -147,6 +197,7 @@ export interface CreditCardPayment {
 export interface Budget {
   id: string;
   user_id: string;
+  financial_account_id?: string;
   category_id: string;
   month: number;
   year: number;
@@ -157,6 +208,8 @@ export interface Budget {
 export interface Asset {
   id: string;
   user_id: string;
+  financial_account_id?: string;
+  created_by?: string;
   name: string;
   type: AssetType;
   current_value: number;
@@ -166,6 +219,8 @@ export interface Asset {
 export interface Liability {
   id: string;
   user_id: string;
+  financial_account_id?: string;
+  created_by?: string;
   name: string;
   type: LiabilityType;
   current_value: number;
@@ -176,6 +231,7 @@ export interface Liability {
 export interface NetWorthSnapshot {
   id: string;
   user_id: string;
+  financial_account_id?: string;
   snapshot_date: string;
   total_assets: number;
   total_liabilities: number;

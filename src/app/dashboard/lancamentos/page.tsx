@@ -6,7 +6,7 @@ import { MonthlySelector } from '@/components/layout/MonthlySelector';
 import { DynamicIcon } from '@/components/ui/Icon';
 import { 
   Search, Filter, Plus, CheckCircle2, Clock, 
-  Trash2, Copy, Edit3, ArrowDownRight, ArrowUpRight, ArrowLeftRight 
+  Trash2, Copy, Edit3, ArrowDownRight, ArrowUpRight, ArrowLeftRight, User 
 } from 'lucide-react';
 import { QuickTransactionModal } from '@/components/modals/QuickTransactionModal';
 
@@ -35,7 +35,8 @@ export default function TransactionsPage() {
       const term = searchTerm.toLowerCase();
       const matchDesc = t.description.toLowerCase().includes(term);
       const catName = categories.find(c => c.id === t.category_id)?.name.toLowerCase() || '';
-      return matchDesc || catName.includes(term);
+      const creatorName = t.created_by_name?.toLowerCase() || '';
+      return matchDesc || catName.includes(term) || creatorName.includes(term);
     }
     return true;
   });
@@ -92,7 +93,7 @@ export default function TransactionsPage() {
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Buscar por descrição ou categoria..."
+              placeholder="Buscar por descrição, categoria ou quem lançou..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-emerald-500 outline-hidden"
@@ -180,11 +181,18 @@ export default function TransactionsPage() {
                             <p className="font-bold text-slate-900 dark:text-white leading-tight">
                               {tx.description}
                             </p>
-                            {tx.type === 'transfer' && (
-                              <span className="text-[11px] text-slate-400">
-                                {account?.name} → {destAccount?.name}
-                              </span>
-                            )}
+                            <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
+                              {tx.created_by_name && (
+                                <span className="font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-md">
+                                  Lançado por {tx.created_by_name.split(' ')[0]}
+                                </span>
+                              )}
+                              {tx.type === 'transfer' && (
+                                <span>
+                                  {account?.name} → {destAccount?.name}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
