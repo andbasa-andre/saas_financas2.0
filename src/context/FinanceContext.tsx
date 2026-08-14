@@ -304,6 +304,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
     setLocalUser(null);
     setUser(null);
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   };
 
   const updateProfile = (data: Partial<Profile>) => {
@@ -398,6 +401,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     const updatedMembers = allMembers.filter(m => !(m.financial_account_id === currentAccount.id && m.user_id === user.id));
     setItem('fin_account_members', updatedMembers);
     loadUserData(user.id);
+    if (typeof window !== 'undefined') {
+      window.location.href = '/';
+    }
   };
 
   const updateFinancialAccountName = (newName: string) => {
