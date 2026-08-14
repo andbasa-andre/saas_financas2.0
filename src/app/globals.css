@@ -10,6 +10,11 @@ body {
   font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
 }
 
+/* Ensure cursor pointer on all buttons, links and select controls */
+button, a, select, [role="button"], input[type="button"], input[type="submit"] {
+  cursor: pointer !important;
+}
+
 /* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;

@@ -34,7 +34,7 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-x-hidden">
       {/* Top Controls: Monthly Selector */}
       <MonthlySelector />
 
@@ -45,20 +45,20 @@ export default function DashboardPage() {
       <PlanningSummaryWidget />
 
       {/* Credit Cards Current Invoice Summary Widget */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 rounded-3xl shadow-sm space-y-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 rounded-3xl shadow-sm space-y-4 max-w-full overflow-hidden">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <CardIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <CardIcon className="w-5 h-5 text-indigo-600 dark:text-indigo-400 shrink-0" />
               Fatura Atual dos Cartões ({selectedMonth}/{selectedYear})
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">Resumo de faturas, vencimentos e limites</p>
           </div>
           <Link
             href="/dashboard/cartoes"
-            className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+            className="flex items-center gap-1 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline shrink-0"
           >
-            Gerenciar faturas <ArrowRight className="w-3.5 h-3.5" />
+            Ver cartões <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
@@ -86,13 +86,13 @@ export default function DashboardPage() {
             const status = determineInvoiceStatus(invoiceTotal, paidAmount, invPeriod.dueDate);
 
             return (
-              <div key={card.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-3">
+              <div key={card.id} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-3 max-w-full">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-bold text-sm text-slate-900 dark:text-white">{card.name}</h4>
+                  <div className="min-w-0">
+                    <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">{card.name}</h4>
                     <span className="text-[10px] text-slate-400 font-medium">•••• {card.last_four_digits}</span>
                   </div>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase shrink-0 ${
                     status === 'paid'
                       ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
                       : status === 'partially_paid'
@@ -107,7 +107,7 @@ export default function DashboardPage() {
 
                 <div className="bg-white dark:bg-slate-900/80 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
                   <span className="text-[11px] text-slate-400 font-medium block mb-0.5">Fatura Atual ({selectedMonth}/{selectedYear})</span>
-                  <span className="text-xl font-black text-slate-900 dark:text-white block">{formatBRL(invoiceTotal)}</span>
+                  <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-white block">{formatBRL(invoiceTotal)}</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
@@ -142,17 +142,17 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Transactions */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 rounded-3xl shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-4 sm:p-5 rounded-3xl shadow-sm space-y-4 max-w-full overflow-hidden">
+        <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-slate-900 dark:text-white">Últimos Lançamentos do Mês</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">Atividades recentes da sua conta</p>
           </div>
           <Link
             href="/dashboard/lancamentos"
-            className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline"
+            className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 hover:underline shrink-0"
           >
-            Ver extrato completo <ArrowRight className="w-3.5 h-3.5" />
+            Extrato completo <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
@@ -167,24 +167,24 @@ export default function DashboardPage() {
               const account = accounts.find(a => a.id === tx.account_id);
 
               return (
-                <div key={tx.id} className="py-3.5 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
+                <div key={tx.id} className="py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-xs"
+                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-xs"
                       style={{ backgroundColor: category?.color || '#64748b' }}
                     >
                       <DynamicIcon name={category?.icon || 'Tag'} size={18} />
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-slate-900 dark:text-white leading-snug">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white truncate">
                         {tx.description}
                       </p>
-                      <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
                         <span>{formatDateBR(tx.date)}</span>
                         <span>•</span>
-                        <span>{account?.name || 'Conta'}</span>
+                        <span className="truncate max-w-[110px]">{account?.name || 'Conta'}</span>
                         <span>•</span>
-                        <span className={`inline-flex items-center gap-1 font-medium ${
+                        <span className={`inline-flex items-center gap-1 font-medium shrink-0 ${
                           tx.status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
                         }`}>
                           {tx.status === 'completed' ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
@@ -194,23 +194,21 @@ export default function DashboardPage() {
                     </div>
                   </div>
 
-                  <div className="text-right flex items-center gap-3">
-                    <div>
-                      <span className={`text-sm font-extrabold block ${
-                        tx.type === 'income'
-                          ? 'text-teal-600 dark:text-teal-400'
-                          : tx.type === 'expense'
-                          ? 'text-rose-600 dark:text-rose-400'
-                          : 'text-blue-600 dark:text-blue-400'
-                      }`}>
-                        {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''} {formatBRL(tx.amount)}
-                      </span>
-                    </div>
+                  <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100/80 dark:border-slate-800/60">
+                    <span className={`text-xs sm:text-sm font-extrabold ${
+                      tx.type === 'income'
+                        ? 'text-teal-600 dark:text-teal-400'
+                        : tx.type === 'expense'
+                        ? 'text-rose-600 dark:text-rose-400'
+                        : 'text-blue-600 dark:text-blue-400'
+                    }`}>
+                      {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''} {formatBRL(tx.amount)}
+                    </span>
 
                     {tx.status === 'planned' && (
                       <button
                         onClick={() => updateTransaction(tx.id, { status: 'completed' })}
-                        className="px-2.5 py-1 text-[11px] font-semibold rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900 transition-colors shrink-0"
+                        className="px-2.5 py-1 text-[11px] font-semibold rounded-xl bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 hover:bg-amber-100 transition-colors shrink-0 cursor-pointer"
                         title="Marcar como realizado"
                       >
                         Pagar / Receber

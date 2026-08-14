@@ -44,6 +44,14 @@ export default function TransactionsPage() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
   };
 
+  const formatDateBR = (dateStr: string) => {
+    if (!dateStr || !dateStr.includes('-')) return dateStr;
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const [y, m, d] = parts;
+    return `${d}/${m}/${y}`;
+  };
+
   const handleDuplicate = (tx: typeof transactions[0]) => {
     addTransaction({
       account_id: tx.account_id,
@@ -68,7 +76,7 @@ export default function TransactionsPage() {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-md transition-all self-start sm:self-auto"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-md transition-all self-start sm:self-auto cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Nova Transação
         </button>
@@ -96,7 +104,7 @@ export default function TransactionsPage() {
             <select
               value={filterType}
               onChange={e => setFilterType(e.target.value)}
-              className="px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs outline-hidden"
+              className="px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs outline-hidden cursor-pointer"
             >
               <option value="all">Todos os tipos</option>
               <option value="income">Receitas</option>
@@ -107,7 +115,7 @@ export default function TransactionsPage() {
             <select
               value={filterStatus}
               onChange={e => setFilterStatus(e.target.value)}
-              className="px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs outline-hidden"
+              className="px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs outline-hidden cursor-pointer"
             >
               <option value="all">Todos os status</option>
               <option value="completed">Realizados</option>
@@ -117,7 +125,7 @@ export default function TransactionsPage() {
             <select
               value={filterCategory}
               onChange={e => setFilterCategory(e.target.value)}
-              className="px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs outline-hidden"
+              className="px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs outline-hidden cursor-pointer"
             >
               <option value="all">Todas categorias</option>
               {categories.map(c => (
@@ -190,7 +198,7 @@ export default function TransactionsPage() {
                       </td>
 
                       <td className="py-3.5 px-4 text-xs font-mono text-slate-500 dark:text-slate-400">
-                        {tx.date}
+                        {formatDateBR(tx.date)}
                       </td>
 
                       <td className="py-3.5 px-4">
@@ -198,7 +206,7 @@ export default function TransactionsPage() {
                           onClick={() => updateTransaction(tx.id, {
                             status: tx.status === 'completed' ? 'planned' : 'completed'
                           })}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-semibold border transition-all ${
+                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-semibold border transition-all cursor-pointer ${
                             tx.status === 'completed'
                               ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 text-emerald-700 dark:text-emerald-300'
                               : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 text-amber-700 dark:text-amber-300'
@@ -225,14 +233,14 @@ export default function TransactionsPage() {
                         <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => handleDuplicate(tx)}
-                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                             title="Duplicar Lançamento"
                           >
                             <Copy className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => deleteTransaction(tx.id)}
-                            className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950 text-slate-400 hover:text-rose-600 transition-colors"
+                            className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
                             title="Excluir Lançamento"
                           >
                             <Trash2 className="w-4 h-4" />
