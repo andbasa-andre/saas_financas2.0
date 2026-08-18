@@ -18,6 +18,13 @@ export default function OnboardingPage() {
 
   const [step, setStep] = useState<number>(user?.onboarding_step || 1);
 
+  // Se o usuário já concluiu o onboarding, redireciona imediatamente para o dashboard
+  useEffect(() => {
+    if (user && user.onboarding_completed === true) {
+      router.replace('/dashboard');
+    }
+  }, [user, router]);
+
   // Sync step changes with profile state
   const changeStep = (newStep: number) => {
     setStep(newStep);

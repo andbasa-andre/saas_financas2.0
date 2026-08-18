@@ -8,7 +8,10 @@ import {
   AccountMember, AccountInvite 
 } from '@/types/finance';
 import { 
-  getItem, setItem, getLocalUser, setLocalUser, initializeSeedData 
+  getItem, setItem, getLocalUser, setLocalUser, 
+  saveUserProfileToRegistry, getUserProfileFromRegistry, 
+  initializeSeedData, initializeNewUser, 
+  DEFAULT_USER_ID, DEFAULT_FINANCIAL_ACCOUNT_ID 
 } from '@/lib/storage';
 import { calculateFinancialSummary, calculateAccountBalances } from '@/lib/calculations';
 import { 
@@ -138,32 +141,36 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       if (isSupabaseConfigured && supabase) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
+          const registered = getUserProfileFromRegistry(session.user.id) || getUserProfileFromRegistry(session.user.email || '');
+          const isCompleted = session.user.user_metadata?.onboarding_completed === true || registered?.onboarding_completed === true;
+          const currentStep = session.user.user_metadata?.onboarding_step ?? registered?.onboarding_step ?? (isCompleted ? 8 : 1);
+
           const profile: Profile = {
             id: session.user.id,
-            name: session.user.user_metadata?.name || 'Usuário',
+            name: session.user.user_metadata?.name || registered?.name || session.user.email?.split('@')[0] || 'Usuário',
             email: session.user.email || '',
             preferences: { theme: 'system', currency: 'BRL' },
-            onboarding_completed: session.user.user_metadata?.onboarding_completed ?? false,
-            onboarding_step: session.user.user_metadata?.onboarding_step ?? 1,
-            show_onboarding_checklist: true,
+            onboarding_completed: isCompleted,
+            onboarding_step: currentStep,
+            financial_goals: session.user.user_metadata?.financial_goals || registered?.financial_goals || [],
+            show_onboarding_checklist: registered?.show_onboarding_checklist ?? true,
             created_at: session.user.created_at
           };
           setUser(profile);
-          loadUserData(profile.id);
+          setLocalUser(profile);
+          loadUserData(profile.id, profile.name, profile.email);
         } else {
           const localU = getLocalUser();
-          setUser(localU);
           if (localU) {
-            initializeSeedData(localU.id);
-            loadUserData(localU.id);
+            setUser(localU);
+            loadUserData(localU.id, localU.name, localU.email);
           }
         }
       } else {
         const localU = getLocalUser();
-        setUser(localU);
         if (localU) {
-          initializeSeedData(localU.id);
-          loadUserData(localU.id);
+          setUser(localU);
+          loadUserData(localU.id, localU.name, localU.email);
         }
       }
       setIsLoading(false);
@@ -187,18 +194,31 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  const loadUserData = (userId: string) => {
-    const allFinAccounts = getItem<FinancialAccount[]>('fin_family_accounts', []);
-    const allMembers = getItem<AccountMember[]>('fin_account_members', []);
+  const loadUserData = (userId: string, userName?: string, userEmail?: string) => {
+    let allFinAccounts = getItem<FinancialAccount[]>('fin_family_accounts', []);
+    let allMembers = getItem<AccountMember[]>('fin_account_members', []);
     const allInvites = getItem<AccountInvite[]>('fin_account_invites', []);
 
-    // Find member record for user
-    const memberRecord = allMembers.find(m => m.user_id === userId && m.status === 'active');
-    const finAccId = memberRecord?.financial_account_id || allFinAccounts[0]?.id || 'fa-fam-123';
+    // Find active membership record for this specific user
+    let memberRecord = allMembers.find(m => m.user_id === userId && m.status === 'active');
+    let finAccId = memberRecord?.financial_account_id;
+
+    // If user has no membership yet
+    if (!finAccId) {
+      if (userId === DEFAULT_USER_ID) {
+        initializeSeedData(DEFAULT_USER_ID);
+        finAccId = DEFAULT_FINANCIAL_ACCOUNT_ID;
+      } else {
+        finAccId = initializeNewUser(userId, userName || 'Usuário', userEmail || '');
+      }
+      allFinAccounts = getItem<FinancialAccount[]>('fin_family_accounts', []);
+      allMembers = getItem<AccountMember[]>('fin_account_members', []);
+      memberRecord = allMembers.find(m => m.user_id === userId && m.status === 'active');
+    }
 
     const currentFinAccount = allFinAccounts.find(fa => fa.id === finAccId) || {
       id: finAccId,
-      name: 'Família Silva',
+      name: 'Minha Conta Financeira',
       owner_id: userId,
       created_at: new Date().toISOString()
     };
@@ -211,7 +231,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     const activeInvites = allInvites.filter(i => i.financial_account_id === finAccId);
     setAccountInvites(activeInvites);
 
-    // Load shared financial data for this financial_account_id
+    // Load financial data STRICTLY for this financial_account_id
     const allAccounts = getItem<Account[]>('fin_accounts', []);
     const allCategories = getItem<Category[]>('fin_categories', []);
     const allTransactions = getItem<Transaction[]>('fin_transactions', []);
@@ -223,16 +243,16 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     const allPayments = getItem<CreditCardPayment[]>('fin_card_payments', []);
     const allSnapshots = getItem<NetWorthSnapshot[]>('fin_snapshots', []);
 
-    setAccounts(allAccounts.filter(a => a.financial_account_id === finAccId || a.user_id === userId));
-    setCategories(allCategories.filter(c => c.financial_account_id === finAccId || c.user_id === userId));
-    setTransactions(allTransactions.filter(t => t.financial_account_id === finAccId || t.user_id === userId));
-    setBudgets(allBudgets.filter(b => b.financial_account_id === finAccId || b.user_id === userId));
-    setAssets(allAssets.filter(a => a.financial_account_id === finAccId || a.user_id === userId));
-    setLiabilities(allLiabilities.filter(l => l.financial_account_id === finAccId || l.user_id === userId));
-    setCreditCards(allCards.filter(c => c.financial_account_id === finAccId || c.user_id === userId));
-    setCardPurchases(allPurchases.filter(p => p.financial_account_id === finAccId || p.user_id === userId));
-    setCardPayments(allPayments.filter(pay => pay.financial_account_id === finAccId || pay.user_id === userId));
-    setSnapshots(allSnapshots.filter(s => s.financial_account_id === finAccId || s.user_id === userId));
+    setAccounts(allAccounts.filter(a => a.financial_account_id === finAccId));
+    setCategories(allCategories.filter(c => c.financial_account_id === finAccId));
+    setTransactions(allTransactions.filter(t => t.financial_account_id === finAccId));
+    setBudgets(allBudgets.filter(b => b.financial_account_id === finAccId));
+    setAssets(allAssets.filter(a => a.financial_account_id === finAccId));
+    setLiabilities(allLiabilities.filter(l => l.financial_account_id === finAccId));
+    setCreditCards(allCards.filter(c => c.financial_account_id === finAccId));
+    setCardPurchases(allPurchases.filter(p => p.financial_account_id === finAccId));
+    setCardPayments(allPayments.filter(pay => pay.financial_account_id === finAccId));
+    setSnapshots(allSnapshots.filter(s => s.financial_account_id === finAccId));
   };
 
   const setPeriod = (year: number, month: number) => {
@@ -242,53 +262,85 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   // Auth Functions
   const login = async (email: string, pass: string): Promise<boolean> => {
+    const cleanEmail = email.trim().toLowerCase();
+
     if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: pass });
       if (error || !data.user) return false;
+
+      const registered = getUserProfileFromRegistry(data.user.id) || getUserProfileFromRegistry(cleanEmail);
+      const isCompleted = data.user.user_metadata?.onboarding_completed === true || registered?.onboarding_completed === true;
+      const currentStep = data.user.user_metadata?.onboarding_step ?? registered?.onboarding_step ?? (isCompleted ? 8 : 1);
+
       const profile: Profile = {
         id: data.user.id,
-        name: data.user.user_metadata?.name || 'Usuário',
-        email: data.user.email || '',
+        name: data.user.user_metadata?.name || registered?.name || cleanEmail.split('@')[0] || 'Usuário',
+        email: data.user.email || cleanEmail,
         preferences: { theme: 'system', currency: 'BRL' },
-        onboarding_completed: data.user.user_metadata?.onboarding_completed ?? false,
-        onboarding_step: data.user.user_metadata?.onboarding_step ?? 1,
-        show_onboarding_checklist: true,
+        onboarding_completed: isCompleted,
+        onboarding_step: currentStep,
+        financial_goals: data.user.user_metadata?.financial_goals || registered?.financial_goals || [],
+        show_onboarding_checklist: registered?.show_onboarding_checklist ?? true,
         created_at: data.user.created_at
       };
       setUser(profile);
-      loadUserData(profile.id);
+      setLocalUser(profile);
+      loadUserData(profile.id, profile.name, profile.email);
       return true;
     } else {
-      const mockProfile: Profile = {
-        id: 'demo-user-123',
-        name: email.split('@')[0] || 'Usuário',
-        email: email,
-        preferences: { theme: 'system', currency: 'BRL' },
-        onboarding_completed: true,
-        onboarding_step: 8,
-        show_onboarding_checklist: true,
-        created_at: new Date().toISOString()
-      };
-      setLocalUser(mockProfile);
-      setUser(mockProfile);
-      initializeSeedData(mockProfile.id);
-      loadUserData(mockProfile.id);
+      // Local development or offline mode
+      const registered = getUserProfileFromRegistry(cleanEmail);
+
+      let profile: Profile;
+      if (registered) {
+        profile = registered;
+      } else if (cleanEmail === 'carlos@exemplo.com' || cleanEmail === 'demo') {
+        profile = {
+          id: DEFAULT_USER_ID,
+          name: 'Carlos Silva',
+          email: 'carlos@exemplo.com',
+          preferences: { theme: 'system', currency: 'BRL' },
+          onboarding_completed: true,
+          onboarding_step: 8,
+          show_onboarding_checklist: true,
+          created_at: new Date().toISOString()
+        };
+      } else {
+        const newUserId = `user-${Date.now()}`;
+        profile = {
+          id: newUserId,
+          name: cleanEmail.split('@')[0] || 'Usuário',
+          email: cleanEmail,
+          preferences: { theme: 'system', currency: 'BRL' },
+          onboarding_completed: false,
+          onboarding_step: 1,
+          show_onboarding_checklist: true,
+          created_at: new Date().toISOString()
+        };
+      }
+
+      setUser(profile);
+      setLocalUser(profile);
+      loadUserData(profile.id, profile.name, profile.email);
       return true;
     }
   };
 
   const signup = async (name: string, email: string, pass: string): Promise<boolean> => {
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanName = name.trim();
+
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.auth.signUp({
-        email,
+        email: cleanEmail,
         password: pass,
-        options: { data: { name, onboarding_completed: false, onboarding_step: 1 } }
+        options: { data: { name: cleanName, onboarding_completed: false, onboarding_step: 1 } }
       });
       if (error || !data.user) return false;
       const profile: Profile = {
         id: data.user.id,
-        name,
-        email,
+        name: cleanName,
+        email: cleanEmail,
         preferences: { theme: 'system', currency: 'BRL' },
         onboarding_completed: false,
         onboarding_step: 1,
@@ -296,24 +348,24 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         created_at: data.user.created_at
       };
       setUser(profile);
-      loadUserData(profile.id);
+      setLocalUser(profile);
+      loadUserData(profile.id, profile.name, profile.email);
       return true;
     } else {
       const newUserId = `user-${Date.now()}`;
-      const mockProfile: Profile = {
+      const profile: Profile = {
         id: newUserId,
-        name,
-        email,
+        name: cleanName,
+        email: cleanEmail,
         preferences: { theme: 'system', currency: 'BRL' },
         onboarding_completed: false,
         onboarding_step: 1,
         show_onboarding_checklist: true,
         created_at: new Date().toISOString()
       };
-      setLocalUser(mockProfile);
-      setUser(mockProfile);
-      initializeSeedData(mockProfile.id);
-      loadUserData(mockProfile.id);
+      setUser(profile);
+      setLocalUser(profile);
+      loadUserData(profile.id, profile.name, profile.email);
       return true;
     }
   };
@@ -449,7 +501,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setItem('fin_account_members', [...allMembers, newMember]);
     }
 
-    loadUserData(user.id);
+    loadUserData(user.id, user.name, user.email);
     return true;
   };
 
@@ -466,7 +518,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     const allMembers = getItem<AccountMember[]>('fin_account_members', []);
     const updatedMembers = allMembers.filter(m => !(m.financial_account_id === currentAccount.id && m.user_id === user.id));
     setItem('fin_account_members', updatedMembers);
-    loadUserData(user.id);
+    loadUserData(user.id, user.name, user.email);
     if (typeof window !== 'undefined') {
       window.location.href = '/';
     }
@@ -579,7 +631,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     if (!user || !currentAccount) return;
     const all = getItem<Budget[]>('fin_budgets', []);
     const existingIdx = all.findIndex(
-      b => (b.financial_account_id === currentAccount.id || b.user_id === user.id) && b.category_id === categoryId && b.month === selectedMonth && b.year === selectedYear
+      b => b.financial_account_id === currentAccount.id && b.category_id === categoryId && b.month === selectedMonth && b.year === selectedYear
     );
 
     let updatedAll: Budget[];
