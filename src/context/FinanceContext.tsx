@@ -48,7 +48,7 @@ interface FinanceContextType {
   // Auth methods
   login: (email: string, pass: string) => Promise<boolean>;
   signup: (name: string, email: string, pass: string) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateProfile: (data: Partial<Profile>) => void;
 
   // Onboarding Methods
@@ -134,8 +134,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const [cardPayments, setCardPayments] = useState<CreditCardPayment[]>([]);
   const [snapshots, setSnapshots] = useState<NetWorthSnapshot[]>([]);
 
-  // Initialize Auth & Data
+  // Initialize Auth & Data Listener
   useEffect(() => {
+    let authListener: { subscription: { unsubscribe: () => void } } | null = null;
+
     async function init() {
       setIsLoading(true);
       if (isSupabaseConfigured && supabase) {
@@ -160,22 +162,50 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
           setLocalUser(profile);
           loadUserData(profile.id, profile.name, profile.email);
         } else {
-          const localU = getLocalUser();
-          if (localU) {
-            setUser(localU);
-            loadUserData(localU.id, localU.name, localU.email);
-          }
+          setUser(null);
+          setLocalUser(null);
         }
+
+        const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'SIGNED_OUT' || !session) {
+            setUser(null);
+            setLocalUser(null);
+          } else if (event === 'SIGNED_IN' && session?.user) {
+            const registered = getUserProfileFromRegistry(session.user.id) || getUserProfileFromRegistry(session.user.email || '');
+            const isCompleted = session.user.user_metadata?.onboarding_completed === true || registered?.onboarding_completed === true;
+            const profile: Profile = {
+              id: session.user.id,
+              name: session.user.user_metadata?.name || registered?.name || session.user.email?.split('@')[0] || 'Usuário',
+              email: session.user.email || '',
+              preferences: { theme: 'system', currency: 'BRL' },
+              onboarding_completed: isCompleted,
+              onboarding_step: session.user.user_metadata?.onboarding_step ?? (isCompleted ? 8 : 1),
+              financial_goals: session.user.user_metadata?.financial_goals || registered?.financial_goals || [],
+              show_onboarding_checklist: registered?.show_onboarding_checklist ?? true,
+              created_at: session.user.created_at
+            };
+            setUser(profile);
+            setLocalUser(profile);
+            loadUserData(profile.id, profile.name, profile.email);
+          }
+        });
+        authListener = listener;
       } else {
         const localU = getLocalUser();
         if (localU) {
           setUser(localU);
           loadUserData(localU.id, localU.name, localU.email);
+        } else {
+          setUser(null);
         }
       }
       setIsLoading(false);
     }
     init();
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
   }, []);
 
   // Sync html theme class
@@ -370,14 +400,26 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
-    if (isSupabaseConfigured && supabase) {
-      supabase.auth.signOut();
-    }
-    setLocalUser(null);
-    setUser(null);
-    if (typeof window !== 'undefined') {
-      window.location.href = '/';
+  const logout = async () => {
+    try {
+      if (isSupabaseConfigured && supabase) {
+        await supabase.auth.signOut();
+      }
+    } catch (err) {
+      console.error('Logout error:', err);
+    } finally {
+      setUser(null);
+      setLocalUser(null);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('fin_current_user');
+        // Clear supabase auth tokens if stored in localStorage
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+            localStorage.removeItem(key);
+          }
+        });
+        window.location.replace('/');
+      }
     }
   };
 
@@ -520,7 +562,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setItem('fin_account_members', updatedMembers);
     loadUserData(user.id, user.name, user.email);
     if (typeof window !== 'undefined') {
-      window.location.href = '/';
+      window.location.replace('/');
     }
   };
 
