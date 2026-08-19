@@ -4,8 +4,9 @@ import React, { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFinance } from '@/context/FinanceContext';
 import { getItem } from '@/lib/storage';
+import { decodeInviteToken } from '@/lib/familyEngine';
 import { AccountInvite, FinancialAccount } from '@/types/finance';
-import { Users, UserPlus, CheckCircle2, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Users, UserPlus, CheckCircle2, AlertCircle, ArrowRight, ShieldCheck, Lock, Mail, User } from 'lucide-react';
 
 interface InvitePageProps {
   params: Promise<{ token: string }>;
@@ -16,8 +17,8 @@ export default function InvitePage({ params }: InvitePageProps) {
   const router = useRouter();
   const { user, login, signup, acceptInviteToken } = useFinance();
 
-  const [invite, setInvite] = useState<AccountInvite | null>(null);
   const [finAccount, setFinAccount] = useState<FinancialAccount | null>(null);
+  const [inviterName, setInviterName] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -28,8 +29,44 @@ export default function InvitePage({ params }: InvitePageProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
+    if (!token) {
+      setErrorMsg('Token de convite não encontrado.');
+      setLoading(false);
+      return;
+    }
+
+    // 1. Try decoding the stateless self-contained token
+    const decoded = decodeInviteToken(token);
+    if (decoded.isValid) {
+      if (decoded.isExpired) {
+        setErrorMsg('Este convite expirou. Peça ao administrador da conta para gerar um novo convite.');
+        setLoading(false);
+        return;
+      }
+
+      setFinAccount({
+        id: decoded.accId!,
+        name: decoded.accName!,
+        owner_id: decoded.ownerId || '',
+        created_at: new Date().toISOString()
+      });
+
+      if (decoded.ownerName) {
+        setInviterName(decoded.ownerName);
+      }
+
+      if (decoded.invitedName) {
+        setName(decoded.invitedName);
+      }
+
+      setLoading(false);
+      return;
+    }
+
+    // 2. Fallback to legacy local invites (if on same device)
     const allInvites = getItem<AccountInvite[]>('fin_account_invites', []);
     const foundInvite = allInvites.find(i => i.token === token && i.status === 'pending');
 
@@ -42,7 +79,6 @@ export default function InvitePage({ params }: InvitePageProps) {
     const allFinAccounts = getItem<FinancialAccount[]>('fin_family_accounts', []);
     const foundAccount = allFinAccounts.find(fa => fa.id === foundInvite.financial_account_id);
 
-    setInvite(foundInvite);
     setFinAccount(foundAccount || {
       id: foundInvite.financial_account_id,
       name: 'Família Compartilhada',
@@ -54,51 +90,69 @@ export default function InvitePage({ params }: InvitePageProps) {
 
   const handleAcceptLoggedIn = async () => {
     if (!token) return;
+    setIsSubmitting(true);
     const ok = await acceptInviteToken(token);
     if (ok) {
       setSuccessMsg('Convite aceito com sucesso! Redirecionando...');
-      setTimeout(() => router.push('/dashboard'), 1500);
+      setTimeout(() => router.push('/dashboard'), 1200);
     } else {
-      setErrorMsg('Não foi possível aceitar este convite.');
+      setErrorMsg('Não foi possível aceitar este convite. Ele pode ter expirado.');
+      setIsSubmitting(false);
     }
   };
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setIsSubmitting(true);
 
-    if (mode === 'register') {
-      if (password !== confirmPassword) {
-        setErrorMsg('As senhas não coincidem.');
-        return;
-      }
-      const signedUp = await signup(name.trim(), email.trim(), password);
-      if (!signedUp) {
-        setErrorMsg('Erro ao criar conta. Verifique os dados e tente novamente.');
-        return;
-      }
-    } else {
-      const loggedIn = await login(email.trim(), password);
-      if (!loggedIn) {
-        setErrorMsg('E-mail ou senha incorretos.');
-        return;
-      }
-    }
+    try {
+      if (mode === 'register') {
+        if (password !== confirmPassword) {
+          setErrorMsg('As senhas não coincidem.');
+          setIsSubmitting(false);
+          return;
+        }
+        if (password.length < 6) {
+          setErrorMsg('A senha deve ter no mínimo 6 caracteres.');
+          setIsSubmitting(false);
+          return;
+        }
 
-    // After auth, accept invite automatically
-    const accepted = await acceptInviteToken(token);
-    if (accepted) {
-      setSuccessMsg('Conta vinculada com sucesso! Redirecionando para a conta familiar...');
-      setTimeout(() => router.push('/dashboard'), 1500);
-    } else {
-      setErrorMsg('Conta criada, mas o convite expirou.');
+        const signedUp = await signup(name.trim(), email.trim(), password);
+        if (!signedUp) {
+          setErrorMsg('Erro ao criar conta. Verifique os dados e tente novamente.');
+          setIsSubmitting(false);
+          return;
+        }
+      } else {
+        const loggedIn = await login(email.trim(), password);
+        if (!loggedIn) {
+          setErrorMsg('E-mail ou senha incorretos.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // After auth, accept invite automatically
+      const accepted = await acceptInviteToken(token);
+      if (accepted) {
+        setSuccessMsg('Conta vinculada com sucesso! Redirecionando para a conta familiar...');
+        setTimeout(() => router.push('/dashboard'), 1200);
+      } else {
+        setErrorMsg('Conta criada, mas o convite expirou.');
+        setIsSubmitting(false);
+      }
+    } catch {
+      setErrorMsg('Ocorreu um erro no processamento do convite.');
+      setIsSubmitting(false);
     }
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
-        <div className="animate-spin w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full" />
+        <div className="animate-spin w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full" />
       </div>
     );
   }
@@ -116,7 +170,7 @@ export default function InvitePage({ params }: InvitePageProps) {
             Você foi convidado!
           </h1>
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            Você foi convidado para participar da conta financeira familiar:
+            {inviterName ? `${inviterName} convidou você para` : 'Você foi convidado para'} participar da conta financeira:
           </p>
 
           <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 inline-block w-full">
@@ -154,21 +208,21 @@ export default function InvitePage({ params }: InvitePageProps) {
 
             <button
               onClick={handleAcceptLoggedIn}
-              className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              disabled={isSubmitting}
+              className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              Aceitar Convite e Entrar na Conta <ArrowRight className="w-4 h-4" />
+              {isSubmitting ? 'Conectando...' : 'Aceitar Convite e Entrar na Conta'} <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         ) : (
-          /* Form for new users (Register or Login) */
+          /* If guest: Option to Register or Login */
           <div className="space-y-4 pt-2">
-            {/* Mode Switcher Pills */}
-            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl text-xs font-semibold">
+            <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl text-xs font-bold">
               <button
                 type="button"
                 onClick={() => setMode('register')}
-                className={`flex-1 py-2 rounded-xl text-center transition-all ${
-                  mode === 'register' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500'
+                className={`py-2 rounded-xl transition-all cursor-pointer ${
+                  mode === 'register' ? 'bg-white dark:bg-slate-900 shadow-xs text-slate-900 dark:text-white' : 'text-slate-500'
                 }`}
               >
                 Criar Minha Conta
@@ -176,77 +230,95 @@ export default function InvitePage({ params }: InvitePageProps) {
               <button
                 type="button"
                 onClick={() => setMode('login')}
-                className={`flex-1 py-2 rounded-xl text-center transition-all ${
-                  mode === 'login' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-xs' : 'text-slate-500'
+                className={`py-2 rounded-xl transition-all cursor-pointer ${
+                  mode === 'login' ? 'bg-white dark:bg-slate-900 shadow-xs text-slate-900 dark:text-white' : 'text-slate-500'
                 }`}
               >
-                Já Tenho Conta (Entrar)
+                Já tenho Conta
               </button>
             </div>
 
-            <form onSubmit={handleAuthSubmit} className="space-y-3 text-xs">
+            <form onSubmit={handleAuthSubmit} className="space-y-3">
               {mode === 'register' && (
                 <div>
-                  <label className="block text-slate-500 mb-1 font-medium">Seu Nome Completo</label>
-                  <input
-                    type="text"
-                    placeholder="Ex: Jaqueline Silva"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    required
-                    className="w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm outline-hidden"
-                  />
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Seu Nome</label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      required
+                      placeholder="Nome completo"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs outline-hidden focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
                 </div>
               )}
 
               <div>
-                <label className="block text-slate-500 mb-1 font-medium">E-mail</label>
-                <input
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                  className="w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm outline-hidden"
-                />
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">E-mail</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                    placeholder="seu.email@exemplo.com"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
               </div>
 
               <div>
-                <label className="block text-slate-500 mb-1 font-medium">Senha</label>
-                <input
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  className="w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm outline-hidden"
-                />
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Senha</label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    placeholder="••••••••"
+                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
               </div>
 
               {mode === 'register' && (
                 <div>
-                  <label className="block text-slate-500 mb-1 font-medium">Confirmar Senha</label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={e => setConfirmPassword(e.target.value)}
-                    required
-                    className="w-full p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm outline-hidden"
-                  />
+                  <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Confirmar Senha</label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={e => setConfirmPassword(e.target.value)}
+                      required
+                      placeholder="••••••••"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs outline-hidden focus:ring-2 focus:ring-emerald-500"
+                    />
+                  </div>
                 </div>
               )}
 
               <button
                 type="submit"
-                className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer pt-3"
+                disabled={isSubmitting}
+                className="w-full py-3 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
               >
-                {mode === 'register' ? 'Criar Conta e Aceitar Convite' : 'Entrar e Aceitar Convite'}
+                {isSubmitting ? 'Processando...' : (mode === 'register' ? 'Criar Conta e Aceitar Convite' : 'Entrar e Aceitar Convite')}
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           </div>
         )}
+
+        <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-center gap-1.5 text-slate-400 text-xs">
+          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+          <span>Seus dados financeiros estarão 100% seguros</span>
+        </div>
       </div>
     </div>
   );

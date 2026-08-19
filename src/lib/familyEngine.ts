@@ -2,13 +2,88 @@
  * Utilitários para gestão de convites familiares e integração com WhatsApp
  */
 
-export function generateSecureToken(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let result = 'inv_';
-  for (let i = 0; i < 24; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+export interface DecodedInvite {
+  isValid: boolean;
+  isExpired: boolean;
+  accId?: string;
+  accName?: string;
+  ownerId?: string;
+  ownerName?: string;
+  phone?: string;
+  invitedName?: string;
+  expiresAt?: Date;
+}
+
+/**
+ * Gera um token de convite autônomo (stateless/self-contained),
+ * permitindo que qualquer dispositivo decodifique a conta familiar e o remetente sem depender do storage local do dispositivo emissor.
+ */
+export function generateInviteToken(payload: {
+  accId: string;
+  accName: string;
+  ownerId: string;
+  ownerName: string;
+  phone?: string;
+  invitedName?: string;
+  expiresInDays?: number;
+}): string {
+  const expiresAt = Date.now() + (payload.expiresInDays || 14) * 24 * 60 * 60 * 1000;
+  const data = {
+    aid: payload.accId,
+    anm: payload.accName,
+    oid: payload.ownerId,
+    onm: payload.ownerName,
+    ph: payload.phone || '',
+    inm: payload.invitedName || '',
+    iat: Date.now(),
+    exp: expiresAt
+  };
+  const json = JSON.stringify(data);
+  const b64 = typeof window !== 'undefined' 
+    ? btoa(unescape(encodeURIComponent(json)))
+    : Buffer.from(json).toString('base64');
+  const safeToken = b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return `inv_${safeToken}`;
+}
+
+/**
+ * Decodifica e valida o token de convite recebido via link WhatsApp
+ */
+export function decodeInviteToken(token: string): DecodedInvite {
+  try {
+    if (!token || !token.startsWith('inv_')) {
+      return { isValid: false, isExpired: false };
+    }
+    const raw = token.slice(4);
+    let b64 = raw.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4 !== 0) {
+      b64 += '=';
+    }
+    const json = typeof window !== 'undefined'
+      ? decodeURIComponent(escape(atob(b64)))
+      : Buffer.from(b64, 'base64').toString('utf-8');
+    const data = JSON.parse(json);
+
+    if (!data.aid || !data.anm || !data.exp) {
+      return { isValid: false, isExpired: false };
+    }
+
+    const isExpired = Date.now() > Number(data.exp);
+
+    return {
+      isValid: true,
+      isExpired,
+      accId: data.aid,
+      accName: data.anm,
+      ownerId: data.oid,
+      ownerName: data.onm,
+      phone: data.ph,
+      invitedName: data.inm,
+      expiresAt: new Date(data.exp)
+    };
+  } catch {
+    return { isValid: false, isExpired: false };
   }
-  return result;
 }
 
 export function cleanPhoneDigits(phone: string): string {

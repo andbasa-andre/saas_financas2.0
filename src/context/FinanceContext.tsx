@@ -17,7 +17,7 @@ import { calculateFinancialSummary, calculateAccountBalances } from '@/lib/calcu
 import { 
   calculateCardLimits, generateInstallmentPurchases, getInvoicePeriodForPurchase, determineInvoiceStatus 
 } from '@/lib/creditCardEngine';
-import { generateSecureToken, createWhatsAppShareUrl } from '@/lib/familyEngine';
+import { generateInviteToken, decodeInviteToken, createWhatsAppShareUrl } from '@/lib/familyEngine';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import { capitalizeFirstLetter } from '@/lib/stringUtils';
 
@@ -481,14 +481,23 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setLocalUser(updated);
   };
 
-  // WhatsApp Invite creation
+  // WhatsApp Invite creation with stateless URL-safe token
   const createWhatsAppInvite = (phone: string, invitedName?: string): string => {
     if (!user || !currentAccount) return '';
 
     const formattedInvitedName = invitedName ? capitalizeFirstLetter(invitedName) : undefined;
-    const token = generateSecureToken();
+    const token = generateInviteToken({
+      accId: currentAccount.id,
+      accName: currentAccount.name,
+      ownerId: user.id,
+      ownerName: user.name,
+      phone: phone,
+      invitedName: formattedInvitedName,
+      expiresInDays: 30
+    });
+
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // Valid for 7 days
+    expiresAt.setDate(expiresAt.getDate() + 30);
 
     const newInvite: AccountInvite = {
       id: `inv-${Date.now()}`,
@@ -515,23 +524,68 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const acceptInviteToken = async (token: string): Promise<boolean> => {
     if (!user) return false;
+
+    // 1. Try decoding stateless self-contained token first
+    const decoded = decodeInviteToken(token);
+    if (decoded.isValid) {
+      if (decoded.isExpired) {
+        return false;
+      }
+
+      const targetAccId = decoded.accId!;
+      const targetAccName = decoded.accName!;
+      const targetOwnerId = decoded.ownerId || user.id;
+
+      // Ensure the financial account exists in storage
+      const allFinAccounts = getItem<FinancialAccount[]>('fin_family_accounts', []);
+      const existingAcc = allFinAccounts.find(fa => fa.id === targetAccId);
+      if (!existingAcc) {
+        const newAcc: FinancialAccount = {
+          id: targetAccId,
+          name: targetAccName,
+          owner_id: targetOwnerId,
+          created_at: new Date().toISOString()
+        };
+        setItem('fin_family_accounts', [...allFinAccounts, newAcc]);
+      }
+
+      // Bind user to financial account as member
+      const allMembers = getItem<AccountMember[]>('fin_account_members', []);
+      const alreadyMember = allMembers.some(m => m.financial_account_id === targetAccId && m.user_id === user.id);
+
+      if (!alreadyMember) {
+        const newMember: AccountMember = {
+          id: `mem-${Date.now()}`,
+          financial_account_id: targetAccId,
+          user_id: user.id,
+          role: 'member',
+          status: 'active',
+          user_name: user.name,
+          user_email: user.email,
+          created_at: new Date().toISOString()
+        };
+        setItem('fin_account_members', [...allMembers, newMember]);
+      }
+
+      loadUserData(user.id, user.name, user.email);
+      return true;
+    }
+
+    // 2. Fallback to legacy local storage invites
     const allInvites = getItem<AccountInvite[]>('fin_account_invites', []);
     const invite = allInvites.find(i => i.token === token && i.status === 'pending');
 
     if (!invite) return false;
 
-    // Check expiration
     if (new Date(invite.expires_at) < new Date()) {
       return false;
     }
 
-    // Mark invite as accepted
     const updatedInvites = allInvites.map(i => 
       i.token === token ? { ...i, status: 'accepted' as const, accepted_by: user.id } : i
     );
     setItem('fin_account_invites', updatedInvites);
 
-    // Bind user to financial account as member
     const allMembers = getItem<AccountMember[]>('fin_account_members', []);
     const alreadyMember = allMembers.some(m => m.financial_account_id === invite.financial_account_id && m.user_id === user.id);
 
