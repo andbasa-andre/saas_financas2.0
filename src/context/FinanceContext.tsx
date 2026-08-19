@@ -19,6 +19,7 @@ import {
 } from '@/lib/creditCardEngine';
 import { generateSecureToken, createWhatsAppShareUrl } from '@/lib/familyEngine';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
+import { capitalizeFirstLetter } from '@/lib/stringUtils';
 
 interface FinanceContextType {
   user: Profile | null;
@@ -339,7 +340,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         const newUserId = `user-${Date.now()}`;
         profile = {
           id: newUserId,
-          name: cleanEmail.split('@')[0] || 'Usuário',
+          name: capitalizeFirstLetter(cleanEmail.split('@')[0]) || 'Usuário',
           email: cleanEmail,
           preferences: { theme: 'system', currency: 'BRL' },
           onboarding_completed: false,
@@ -358,7 +359,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const signup = async (name: string, email: string, pass: string): Promise<boolean> => {
     const cleanEmail = email.trim().toLowerCase();
-    const cleanName = name.trim();
+    const cleanName = capitalizeFirstLetter(name);
 
     if (isSupabaseConfigured && supabase) {
       const { data, error } = await supabase.auth.signUp({
@@ -425,7 +426,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const updateProfile = (data: Partial<Profile>) => {
     if (!user) return;
-    const updated = { ...user, ...data };
+    const formattedData = {
+      ...data,
+      name: data.name ? capitalizeFirstLetter(data.name) : user.name
+    };
+    const updated = { ...user, ...formattedData };
     setUser(updated);
     setLocalUser(updated);
   };
@@ -480,6 +485,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const createWhatsAppInvite = (phone: string, invitedName?: string): string => {
     if (!user || !currentAccount) return '';
 
+    const formattedInvitedName = invitedName ? capitalizeFirstLetter(invitedName) : undefined;
     const token = generateSecureToken();
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // Valid for 7 days
@@ -489,7 +495,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       token,
       financial_account_id: currentAccount.id,
       created_by: user.id,
-      invited_name: invitedName,
+      invited_name: formattedInvitedName,
       invited_phone: phone,
       status: 'pending',
       expires_at: expiresAt.toISOString(),
@@ -504,7 +510,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     const origin = typeof window !== 'undefined' ? window.location.origin : 'https://saasfinancas20.vercel.app';
     const inviteUrl = `${origin}/convite/${token}`;
 
-    return createWhatsAppShareUrl(phone, inviteUrl, currentAccount.name, invitedName);
+    return createWhatsAppShareUrl(phone, inviteUrl, currentAccount.name, formattedInvitedName);
   };
 
   const acceptInviteToken = async (token: string): Promise<boolean> => {
@@ -568,13 +574,14 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const updateFinancialAccountName = (newName: string) => {
     if (!currentAccount) return;
+    const formattedName = capitalizeFirstLetter(newName);
     const allFinAccounts = getItem<FinancialAccount[]>('fin_family_accounts', []);
-    const updated = allFinAccounts.map(fa => fa.id === currentAccount.id ? { ...fa, name: newName } : fa);
+    const updated = allFinAccounts.map(fa => fa.id === currentAccount.id ? { ...fa, name: formattedName } : fa);
     setItem('fin_family_accounts', updated);
-    setCurrentAccount(prev => prev ? { ...prev, name: newName } : null);
+    setCurrentAccount(prev => prev ? { ...prev, name: formattedName } : null);
   };
 
-  // CRUD Implementations
+  // CRUD Implementations with auto-capitalization of text descriptions & names
   const addTransaction = (tx: Omit<Transaction, 'id' | 'user_id'>) => {
     if (!user || !currentAccount) return;
     const newTx: Transaction = {
@@ -584,6 +591,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       financial_account_id: currentAccount.id,
       created_by: user.id,
       created_by_name: user.name,
+      description: capitalizeFirstLetter(tx.description),
+      notes: tx.notes ? capitalizeFirstLetter(tx.notes) : undefined,
       created_at: new Date().toISOString()
     };
     const all = getItem<Transaction[]>('fin_transactions', []);
@@ -595,7 +604,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const updateTransaction = (id: string, updatedFields: Partial<Transaction>) => {
     if (!user || !currentAccount) return;
     const all = getItem<Transaction[]>('fin_transactions', []);
-    const updatedAll = all.map(t => (t.id === id ? { ...t, ...updatedFields } : t));
+    const updatedAll = all.map(t => {
+      if (t.id === id) {
+        return {
+          ...t,
+          ...updatedFields,
+          description: updatedFields.description !== undefined ? capitalizeFirstLetter(updatedFields.description) : t.description,
+          notes: updatedFields.notes !== undefined ? (updatedFields.notes ? capitalizeFirstLetter(updatedFields.notes) : undefined) : t.notes
+        };
+      }
+      return t;
+    });
     setItem('fin_transactions', updatedAll);
     setTransactions(updatedAll.filter(t => t.financial_account_id === currentAccount.id));
   };
@@ -615,7 +634,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       id: `acc-${Date.now()}`,
       user_id: user.id,
       financial_account_id: currentAccount.id,
-      created_by: user.id
+      created_by: user.id,
+      name: capitalizeFirstLetter(acc.name),
+      financial_institution: acc.financial_institution ? capitalizeFirstLetter(acc.financial_institution) : undefined
     };
     const all = getItem<Account[]>('fin_accounts', []);
     const updatedAll = [...all, newAcc];
@@ -626,7 +647,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const updateAccount = (id: string, accFields: Partial<Account>) => {
     if (!user || !currentAccount) return;
     const all = getItem<Account[]>('fin_accounts', []);
-    const updatedAll = all.map(a => (a.id === id ? { ...a, ...accFields } : a));
+    const updatedAll = all.map(a => {
+      if (a.id === id) {
+        return {
+          ...a,
+          ...accFields,
+          name: accFields.name !== undefined ? capitalizeFirstLetter(accFields.name) : a.name,
+          financial_institution: accFields.financial_institution !== undefined ? (accFields.financial_institution ? capitalizeFirstLetter(accFields.financial_institution) : undefined) : a.financial_institution
+        };
+      }
+      return a;
+    });
     setItem('fin_accounts', updatedAll);
     setAccounts(updatedAll.filter(a => a.financial_account_id === currentAccount.id));
   };
@@ -645,7 +676,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       ...cat,
       id: `cat-${Date.now()}`,
       user_id: user.id,
-      financial_account_id: currentAccount.id
+      financial_account_id: currentAccount.id,
+      name: capitalizeFirstLetter(cat.name)
     };
     const all = getItem<Category[]>('fin_categories', []);
     const updatedAll = [...all, newCat];
@@ -656,7 +688,16 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const updateCategory = (id: string, catFields: Partial<Category>) => {
     if (!user || !currentAccount) return;
     const all = getItem<Category[]>('fin_categories', []);
-    const updatedAll = all.map(c => (c.id === id ? { ...c, ...catFields } : c));
+    const updatedAll = all.map(c => {
+      if (c.id === id) {
+        return {
+          ...c,
+          ...catFields,
+          name: catFields.name !== undefined ? capitalizeFirstLetter(catFields.name) : c.name
+        };
+      }
+      return c;
+    });
     setItem('fin_categories', updatedAll);
     setCategories(updatedAll.filter(c => c.financial_account_id === currentAccount.id));
   };
@@ -697,7 +738,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const addAsset = (asset: Omit<Asset, 'id' | 'user_id'>) => {
     if (!user || !currentAccount) return;
-    const newAsset: Asset = { ...asset, id: `asset-${Date.now()}`, user_id: user.id, financial_account_id: currentAccount.id, created_by: user.id };
+    const newAsset: Asset = { 
+      ...asset, 
+      id: `asset-${Date.now()}`, 
+      user_id: user.id, 
+      financial_account_id: currentAccount.id, 
+      created_by: user.id,
+      name: capitalizeFirstLetter(asset.name),
+      notes: asset.notes ? capitalizeFirstLetter(asset.notes) : undefined
+    };
     const all = getItem<Asset[]>('fin_assets', []);
     const updatedAll = [...all, newAsset];
     setItem('fin_assets', updatedAll);
@@ -714,7 +763,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 
   const addLiability = (liability: Omit<Liability, 'id' | 'user_id'>) => {
     if (!user || !currentAccount) return;
-    const newLiab: Liability = { ...liability, id: `liab-${Date.now()}`, user_id: user.id, financial_account_id: currentAccount.id, created_by: user.id };
+    const newLiab: Liability = { 
+      ...liability, 
+      id: `liab-${Date.now()}`, 
+      user_id: user.id, 
+      financial_account_id: currentAccount.id, 
+      created_by: user.id,
+      name: capitalizeFirstLetter(liability.name),
+      notes: liability.notes ? capitalizeFirstLetter(liability.notes) : undefined
+    };
     const all = getItem<Liability[]>('fin_liabilities', []);
     const updatedAll = [...all, newLiab];
     setItem('fin_liabilities', updatedAll);
@@ -737,7 +794,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       id: `card-${Date.now()}`,
       user_id: user.id,
       financial_account_id: currentAccount.id,
-      created_by: user.id
+      created_by: user.id,
+      name: capitalizeFirstLetter(card.name),
+      issuer: card.issuer ? capitalizeFirstLetter(card.issuer) : (card.brand ? capitalizeFirstLetter(card.brand) : 'Cartão')
     };
     const all = getItem<CreditCard[]>('fin_credit_cards', []);
     const updatedAll = [...all, newCard];
@@ -765,9 +824,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     const card = creditCards.find(c => c.id === cardId);
     if (!card) return;
 
+    const formattedDesc = capitalizeFirstLetter(description);
+
     const generated = generateInstallmentPurchases(
       card,
-      description,
+      formattedDesc,
       totalAmount,
       installments,
       purchaseDate,

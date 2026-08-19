@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useFinance } from '@/context/FinanceContext';
+import { Transaction } from '@/types/finance';
 import { MonthlySelector } from '@/components/layout/MonthlySelector';
 import { DynamicIcon } from '@/components/ui/Icon';
 import { 
@@ -22,6 +23,7 @@ export default function TransactionsPage() {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterAccount, setFilterAccount] = useState<string>('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   const monthStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
 
@@ -53,7 +55,17 @@ export default function TransactionsPage() {
     return `${d}/${m}/${y}`;
   };
 
-  const handleDuplicate = (tx: typeof transactions[0]) => {
+  const handleOpenCreateModal = () => {
+    setEditingTransaction(null);
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEditModal = (tx: Transaction) => {
+    setEditingTransaction(tx);
+    setIsModalOpen(true);
+  };
+
+  const handleDuplicate = (tx: Transaction) => {
     addTransaction({
       account_id: tx.account_id,
       destination_account_id: tx.destination_account_id,
@@ -76,7 +88,7 @@ export default function TransactionsPage() {
           <p className="text-xs text-slate-500 dark:text-slate-400">Gerencie todas as suas entradas, saídas e transferências</p>
         </div>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleOpenCreateModal}
           className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm shadow-md transition-all self-start sm:self-auto cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Nova Transação
@@ -128,20 +140,35 @@ export default function TransactionsPage() {
               onChange={e => setFilterCategory(e.target.value)}
               className="px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs outline-hidden cursor-pointer"
             >
-              <option value="all">Todas categorias</option>
+              <option value="all">Todas as categorias</option>
               {categories.map(c => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterAccount}
+              onChange={e => setFilterAccount(e.target.value)}
+              className="px-3 py-2 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs outline-hidden cursor-pointer"
+            >
+              <option value="all">Todas as contas</option>
+              {accounts.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
               ))}
             </select>
           </div>
         </div>
       </div>
 
-      {/* Transactions Table */}
-      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl overflow-hidden shadow-sm">
+      {/* Transactions List / Table */}
+      <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xs">
         {filteredTransactions.length === 0 ? (
-          <div className="p-12 text-center text-slate-400 text-sm italic">
-            Nenhum lançamento encontrado com os filtros selecionados.
+          <div className="p-12 text-center text-slate-400">
+            <p className="text-sm font-medium">Nenhum lançamento encontrado para este período.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -157,42 +184,31 @@ export default function TransactionsPage() {
                   <th className="py-3 px-4 text-center">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredTransactions.map(tx => {
                   const category = categories.find(c => c.id === tx.category_id);
                   const account = accounts.find(a => a.id === tx.account_id);
-                  const destAccount = accounts.find(a => a.id === tx.destination_account_id);
 
                   return (
-                    <tr key={tx.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
+                    <tr key={tx.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors group">
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-3">
                           <div
                             className="w-9 h-9 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-xs"
-                            style={{ backgroundColor: category?.color || '#64748b' }}
+                            style={{ backgroundColor: category?.color || (tx.type === 'transfer' ? '#3b82f6' : '#64748b') }}
                           >
-                            {tx.type === 'transfer' ? (
-                              <ArrowLeftRight className="w-4 h-4" />
-                            ) : (
-                              <DynamicIcon name={category?.icon || 'Tag'} size={16} />
-                            )}
+                            <DynamicIcon name={category?.icon || (tx.type === 'transfer' ? 'ArrowLeftRight' : 'Tag')} size={16} />
                           </div>
                           <div>
-                            <p className="font-bold text-slate-900 dark:text-white leading-tight">
+                            <p className="text-sm font-bold text-slate-900 dark:text-white">
                               {tx.description}
                             </p>
-                            <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5">
-                              {tx.created_by_name && (
-                                <span className="font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-md">
-                                  Lançado por {tx.created_by_name.split(' ')[0]}
-                                </span>
-                              )}
-                              {tx.type === 'transfer' && (
-                                <span>
-                                  {account?.name} → {destAccount?.name}
-                                </span>
-                              )}
-                            </div>
+                            {tx.created_by_name && (
+                              <div className="flex items-center gap-1 text-[11px] text-slate-400 mt-0.5">
+                                <User className="w-3 h-3" />
+                                <span>Por {tx.created_by_name.split(' ')[0]}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -239,6 +255,15 @@ export default function TransactionsPage() {
 
                       <td className="py-3.5 px-4 text-center">
                         <div className="flex items-center justify-center gap-1">
+                          {/* Edit button */}
+                          <button
+                            onClick={() => handleOpenEditModal(tx)}
+                            className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors cursor-pointer"
+                            title="Editar Lançamento"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          {/* Duplicate button */}
                           <button
                             onClick={() => handleDuplicate(tx)}
                             className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
@@ -246,6 +271,7 @@ export default function TransactionsPage() {
                           >
                             <Copy className="w-4 h-4" />
                           </button>
+                          {/* Delete button */}
                           <button
                             onClick={() => deleteTransaction(tx.id)}
                             className="p-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
@@ -266,7 +292,11 @@ export default function TransactionsPage() {
 
       <QuickTransactionModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => {
+          setIsModalOpen(false);
+          setEditingTransaction(null);
+        }}
+        transactionToEdit={editingTransaction}
       />
     </div>
   );

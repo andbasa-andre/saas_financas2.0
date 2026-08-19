@@ -85,6 +85,7 @@ export default function RegisterPage() {
                 type="text"
                 value={name}
                 onChange={e => setName(e.target.value)}
+                onBlur={() => setName(prev => prev ? prev.charAt(0).toUpperCase() + prev.slice(1) : '')}
                 required
                 placeholder="Seu Nome"
                 className="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-hidden transition-all"
