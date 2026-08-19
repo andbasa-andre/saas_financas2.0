@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useFinance } from '@/context/FinanceContext';
-import { CheckCircle2, Circle, X, Sparkles, ArrowRight } from 'lucide-react';
+import { CheckCircle2, Circle, X, ListChecks, ArrowRight } from 'lucide-react';
 
 export const OnboardingChecklistWidget: React.FC = () => {
   const { 
@@ -45,7 +45,7 @@ export const OnboardingChecklistWidget: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pr-8">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-md shadow-emerald-600/20">
-            <Sparkles className="w-5 h-5" />
+            <ListChecks className="w-5 h-5" />
           </div>
           <div>
             <h3 className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-white">

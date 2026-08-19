@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useFinance } from '@/context/FinanceContext';
 import { DynamicIcon } from '@/components/ui/Icon';
-import { Tag, Plus, Trash2, Sparkles } from 'lucide-react';
+import { Tag, Plus, Trash2 } from 'lucide-react';
 
 export default function CategoriesPage() {
   const { categories, addCategory, deleteCategory } = useFinance();

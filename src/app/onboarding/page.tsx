@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFinance } from '@/context/FinanceContext';
 import { 
-  Wallet, CheckCircle2, ArrowRight, ArrowLeft, Plus, Sparkles, 
+  Wallet, CheckCircle2, ArrowRight, ArrowLeft, Plus, 
   Landmark, CreditCard, Tag, PiggyBank, Receipt, ShieldCheck, X 
 } from 'lucide-react';
 import { DynamicIcon } from '@/components/ui/Icon';
@@ -225,7 +225,7 @@ export default function OnboardingPage() {
           {step === 1 && (
             <div className="space-y-6 text-center py-4">
               <div className="w-16 h-16 rounded-3xl bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto shadow-inner">
-                <Sparkles className="w-8 h-8" />
+                <Wallet className="w-8 h-8" />
               </div>
 
               <div className="space-y-2">

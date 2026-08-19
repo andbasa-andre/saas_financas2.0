@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useFinance } from '@/context/FinanceContext';
-import { Wallet, Mail, Lock, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
+import { Wallet, Mail, Lock, ArrowRight, ArrowLeft, User } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useFinance();
@@ -142,7 +142,7 @@ export default function LoginPage() {
           disabled={isSubmitting}
           className="w-full py-3 px-4 rounded-2xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
         >
-          <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+          <User className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
           <span>Acessar com Conta de Demonstração</span>
         </button>
 
