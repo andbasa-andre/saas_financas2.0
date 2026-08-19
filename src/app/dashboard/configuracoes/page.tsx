@@ -161,7 +161,7 @@ export default function SettingsPage() {
             Convidar nova pessoa via WhatsApp
           </h4>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Gere um link seguro de convite e abra diretamente no WhatsApp para enviar ao seu cônjuge ou familiar.
+            Gere um link seguro de convite (válido por 15 minutos) e envie diretamente pelo WhatsApp para seu cônjuge ou familiar.
           </p>
 
           {inviteMsg && (

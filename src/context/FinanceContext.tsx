@@ -493,11 +493,11 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       ownerName: user.name,
       phone: phone,
       invitedName: formattedInvitedName,
-      expiresInDays: 30
+      expiresInMinutes: 15
     });
 
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30);
+    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
 
     const newInvite: AccountInvite = {
       id: `inv-${Date.now()}`,

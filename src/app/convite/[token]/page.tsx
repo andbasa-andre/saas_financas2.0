@@ -42,7 +42,7 @@ export default function InvitePage({ params }: InvitePageProps) {
     const decoded = decodeInviteToken(token);
     if (decoded.isValid) {
       if (decoded.isExpired) {
-        setErrorMsg('Este convite expirou. Peça ao administrador da conta para gerar um novo convite.');
+        setErrorMsg('Este convite expirou (validade de 15 minutos). Peça ao administrador da conta para gerar um novo convite.');
         setLoading(false);
         return;
       }

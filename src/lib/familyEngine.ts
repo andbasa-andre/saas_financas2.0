@@ -15,8 +15,7 @@ export interface DecodedInvite {
 }
 
 /**
- * Gera um token de convite autônomo (stateless/self-contained),
- * permitindo que qualquer dispositivo decodifique a conta familiar e o remetente sem depender do storage local do dispositivo emissor.
+ * Gera um token de convite autônomo (stateless/self-contained) com validade padrão de 15 minutos.
  */
 export function generateInviteToken(payload: {
   accId: string;
@@ -25,9 +24,9 @@ export function generateInviteToken(payload: {
   ownerName: string;
   phone?: string;
   invitedName?: string;
-  expiresInDays?: number;
+  expiresInMinutes?: number;
 }): string {
-  const expiresAt = Date.now() + (payload.expiresInDays || 14) * 24 * 60 * 60 * 1000;
+  const expiresAt = Date.now() + (payload.expiresInMinutes || 15) * 60 * 1000;
   const data = {
     aid: payload.accId,
     anm: payload.accName,
@@ -101,7 +100,7 @@ export function createWhatsAppShareUrl(
   const fullPhone = rawDigits.length <= 11 ? `55${rawDigits}` : rawDigits;
 
   const greeting = invitedName ? `Olá, ${invitedName}!` : 'Olá!';
-  const message = `${greeting}\n\nEstou te convidando para participar da nossa conta financeira familiar ("${accountName}").\n\nClique no link abaixo para aceitar o convite e acessar os dados compartilhados da nossa conta:\n\n${inviteUrl}`;
+  const message = `${greeting}\n\nEstou te convidando para participar da nossa conta financeira familiar ("${accountName}").\n\nClique no link abaixo para aceitar o convite e acessar os dados compartilhados da nossa conta:\n\n${inviteUrl}\n\n*(Este convite é válido por 15 minutos)*`;
 
   return `https://wa.me/${fullPhone}?text=${encodeURIComponent(message)}`;
 }
