@@ -4,14 +4,14 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useFinance } from '@/context/FinanceContext';
-import { Wallet, Mail, Lock, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Wallet, Mail, Lock, ArrowRight, ArrowLeft, Sparkles } from 'lucide-react';
 
 export default function LoginPage() {
   const { login } = useFinance();
   const router = useRouter();
 
-  const [email, setEmail] = useState('carlos@exemplo.com');
-  const [password, setPassword] = useState('123456');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -29,6 +29,24 @@ export default function LoginPage() {
       }
     } catch {
       setErrorMsg('Ocorreu um erro ao entrar.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDemoLogin = async () => {
+    setErrorMsg('');
+    setIsSubmitting(true);
+
+    try {
+      const success = await login('carlos@exemplo.com', '123456');
+      if (success) {
+        router.push('/dashboard');
+      } else {
+        setErrorMsg('Não foi possível entrar na conta de demonstração.');
+      }
+    } catch {
+      setErrorMsg('Ocorreu um erro ao acessar a demonstração.');
     } finally {
       setIsSubmitting(false);
     }
@@ -109,6 +127,24 @@ export default function LoginPage() {
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
+
+        {/* Separator */}
+        <div className="my-5 flex items-center gap-3">
+          <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+          <span className="text-xs text-slate-400 font-medium">ou experimente</span>
+          <div className="flex-1 h-px bg-slate-200 dark:bg-slate-800" />
+        </div>
+
+        {/* Separate Demo Account Button */}
+        <button
+          type="button"
+          onClick={handleDemoLogin}
+          disabled={isSubmitting}
+          className="w-full py-3 px-4 rounded-2xl bg-slate-100 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+        >
+          <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+          <span>Acessar com Conta de Demonstração</span>
+        </button>
 
         <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400">
           Ainda não possui uma conta?{' '}
