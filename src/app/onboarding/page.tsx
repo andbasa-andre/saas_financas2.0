@@ -12,18 +12,22 @@ import { DynamicIcon } from '@/components/ui/Icon';
 export default function OnboardingPage() {
   const router = useRouter();
   const { 
-    user, categories, accounts, creditCards, addAccount, addCreditCard, 
+    user, isLoading, categories, accounts, creditCards, addAccount, addCreditCard, 
     addTransaction, addAsset, addLiability, updateOnboardingStep, completeOnboarding 
   } = useFinance();
 
   const [step, setStep] = useState<number>(user?.onboarding_step || 1);
 
-  // Se o usuário já concluiu o onboarding, redireciona imediatamente para o dashboard
+  // Proteção de rota do Onboarding
   useEffect(() => {
-    if (user && user.onboarding_completed === true) {
-      router.replace('/dashboard');
+    if (!isLoading) {
+      if (!user) {
+        router.replace('/login');
+      } else if (user.onboarding_completed === true) {
+        router.replace('/dashboard');
+      }
     }
-  }, [user, router]);
+  }, [user, isLoading, router]);
 
   // Sync step changes with profile state
   const changeStep = (newStep: number) => {
@@ -193,6 +197,14 @@ export default function OnboardingPage() {
   const formatBRL = (val: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
   };
+
+  if (isLoading || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex flex-col justify-between p-4 sm:p-8">

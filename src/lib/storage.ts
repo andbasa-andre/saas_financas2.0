@@ -20,7 +20,8 @@ export const STORAGE_KEYS = {
   NET_WORTH_SNAPSHOTS: 'fin_snapshots',
   FINANCIAL_ACCOUNTS: 'fin_family_accounts',
   ACCOUNT_MEMBERS: 'fin_account_members',
-  ACCOUNT_INVITES: 'fin_account_invites'
+  ACCOUNT_INVITES: 'fin_account_invites',
+  AUTH_CREDENTIALS: 'fin_auth_credentials'
 };
 
 export const DEFAULT_USER_ID = 'demo-user-123';
@@ -69,6 +70,16 @@ export function setItem<T>(key: string, value: T): void {
   }
 }
 
+// Sync cookie for Next.js middleware and route protection
+export function syncAuthCookie(isAuthenticated: boolean): void {
+  if (typeof document === 'undefined') return;
+  if (isAuthenticated) {
+    document.cookie = `fin_auth_session=1; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`;
+  } else {
+    document.cookie = 'fin_auth_session=; path=/; max-age=0; SameSite=Lax';
+  }
+}
+
 // User Profile & Authentication persistence
 export function getLocalUser(): Profile | null {
   return getItem<Profile | null>(STORAGE_KEYS.CURRENT_USER, null);
@@ -76,6 +87,7 @@ export function getLocalUser(): Profile | null {
 
 export function setLocalUser(profile: Profile | null): void {
   setItem(STORAGE_KEYS.CURRENT_USER, profile);
+  syncAuthCookie(Boolean(profile));
   if (profile) {
     saveUserProfileToRegistry(profile);
   }
@@ -93,6 +105,18 @@ export function saveUserProfileToRegistry(profile: Profile): void {
 export function getUserProfileFromRegistry(idOrEmail: string): Profile | null {
   const profiles = getItem<Record<string, Profile>>(STORAGE_KEYS.PROFILES, {});
   return profiles[idOrEmail] || profiles[idOrEmail.toLowerCase()] || null;
+}
+
+// Credentials for local / contingency offline authentication
+export function saveAuthCredential(email: string, passwordHash: string, userId: string): void {
+  const credentials = getItem<Record<string, { passwordHash: string; userId: string }>>(STORAGE_KEYS.AUTH_CREDENTIALS, {});
+  credentials[email.toLowerCase().trim()] = { passwordHash, userId };
+  setItem(STORAGE_KEYS.AUTH_CREDENTIALS, credentials);
+}
+
+export function getAuthCredential(email: string): { passwordHash: string; userId: string } | null {
+  const credentials = getItem<Record<string, { passwordHash: string; userId: string }>>(STORAGE_KEYS.AUTH_CREDENTIALS, {});
+  return credentials[email.toLowerCase().trim()] || null;
 }
 
 // Initialize a brand new clean workspace for a new user

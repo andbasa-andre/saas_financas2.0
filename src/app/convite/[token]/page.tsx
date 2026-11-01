@@ -119,16 +119,16 @@ export default function InvitePage({ params }: InvitePageProps) {
           return;
         }
 
-        const signedUp = await signup(name.trim(), email.trim(), password);
-        if (!signedUp) {
-          setErrorMsg('Erro ao criar conta. Verifique os dados e tente novamente.');
+        const signedUpRes = await signup(name.trim(), email.trim(), password);
+        if (!signedUpRes.success) {
+          setErrorMsg(signedUpRes.error || 'Erro ao criar conta. Verifique os dados e tente novamente.');
           setIsSubmitting(false);
           return;
         }
       } else {
-        const loggedIn = await login(email.trim(), password);
-        if (!loggedIn) {
-          setErrorMsg('E-mail ou senha incorretos.');
+        const loggedInRes = await login(email.trim(), password);
+        if (!loggedInRes.success) {
+          setErrorMsg(loggedInRes.error || 'E-mail ou senha incorretos.');
           setIsSubmitting(false);
           return;
         }

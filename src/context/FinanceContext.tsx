@@ -7,12 +7,7 @@ import {
   NetWorthSnapshot, Profile, FinancialSummary, FinancialAccount, 
   AccountMember, AccountInvite 
 } from '@/types/finance';
-import { 
-  getItem, setItem, getLocalUser, setLocalUser, 
-  saveUserProfileToRegistry, getUserProfileFromRegistry, 
-  initializeSeedData, initializeNewUser, 
-  DEFAULT_USER_ID, DEFAULT_FINANCIAL_ACCOUNT_ID 
-} from '@/lib/storage';
+import { syncAuthCookie } from '@/lib/storage';
 import { calculateFinancialSummary, calculateAccountBalances } from '@/lib/calculations';
 import { 
   calculateCardLimits, generateInstallmentPurchases, getInvoicePeriodForPurchase, determineInvoiceStatus 
@@ -47,47 +42,47 @@ interface FinanceContextType {
   summary: FinancialSummary;
   
   // Auth methods
-  login: (email: string, pass: string) => Promise<boolean>;
-  signup: (name: string, email: string, pass: string) => Promise<boolean>;
+  login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (name: string, email: string, pass: string) => Promise<{ success: boolean; needsEmailConfirmation?: boolean; error?: string }>;
   logout: () => Promise<void>;
-  updateProfile: (data: Partial<Profile>) => void;
+  updateProfile: (data: Partial<Profile>) => Promise<void>;
 
   // Onboarding Methods
-  updateOnboardingStep: (step: number, goals?: string[]) => void;
-  completeOnboarding: () => void;
-  hideOnboardingChecklist: () => void;
+  updateOnboardingStep: (step: number, goals?: string[]) => Promise<void>;
+  completeOnboarding: () => Promise<void>;
+  hideOnboardingChecklist: () => Promise<void>;
 
   // Family Account & Member methods
-  createWhatsAppInvite: (phone: string, invitedName?: string) => string;
+  createWhatsAppInvite: (phone: string, invitedName?: string) => Promise<string>;
   acceptInviteToken: (token: string) => Promise<boolean>;
-  removeMember: (memberId: string) => void;
-  leaveAccount: () => void;
-  updateFinancialAccountName: (newName: string) => void;
+  removeMember: (memberId: string) => Promise<void>;
+  leaveAccount: () => Promise<void>;
+  updateFinancialAccountName: (newName: string) => Promise<void>;
 
   // CRUD methods
-  addTransaction: (tx: Omit<Transaction, 'id' | 'user_id'>) => void;
-  updateTransaction: (id: string, tx: Partial<Transaction>) => void;
-  deleteTransaction: (id: string) => void;
+  addTransaction: (tx: Omit<Transaction, 'id' | 'user_id'>) => Promise<void>;
+  updateTransaction: (id: string, tx: Partial<Transaction>) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
   
-  addAccount: (acc: Omit<Account, 'id' | 'user_id'>) => void;
-  updateAccount: (id: string, acc: Partial<Account>) => void;
-  deleteAccount: (id: string) => void;
+  addAccount: (acc: Omit<Account, 'id' | 'user_id'>) => Promise<void>;
+  updateAccount: (id: string, acc: Partial<Account>) => Promise<void>;
+  deleteAccount: (id: string) => Promise<void>;
 
-  addCategory: (cat: Omit<Category, 'id' | 'user_id'>) => void;
-  updateCategory: (id: string, cat: Partial<Category>) => void;
-  deleteCategory: (id: string) => void;
+  addCategory: (cat: Omit<Category, 'id' | 'user_id'>) => Promise<void>;
+  updateCategory: (id: string, cat: Partial<Category>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
 
-  setBudgetAmount: (categoryId: string, amount: number) => void;
+  setBudgetAmount: (categoryId: string, amount: number) => Promise<void>;
   
-  addAsset: (asset: Omit<Asset, 'id' | 'user_id'>) => void;
-  deleteAsset: (id: string) => void;
+  addAsset: (asset: Omit<Asset, 'id' | 'user_id'>) => Promise<void>;
+  deleteAsset: (id: string) => Promise<void>;
   
-  addLiability: (liability: Omit<Liability, 'id' | 'user_id'>) => void;
-  deleteLiability: (id: string) => void;
+  addLiability: (liability: Omit<Liability, 'id' | 'user_id'>) => Promise<void>;
+  deleteLiability: (id: string) => Promise<void>;
 
   // Credit Card Methods
-  addCreditCard: (card: Omit<CreditCard, 'id' | 'user_id'>) => void;
-  deleteCreditCard: (id: string) => void;
+  addCreditCard: (card: Omit<CreditCard, 'id' | 'user_id'>) => Promise<void>;
+  deleteCreditCard: (id: string) => Promise<void>;
   addCreditCardPurchase: (
     cardId: string, 
     description: string, 
@@ -95,7 +90,7 @@ interface FinanceContextType {
     installments: number, 
     purchaseDate: string, 
     categoryId?: string
-  ) => void;
+  ) => Promise<void>;
   payInvoice: (
     cardId: string, 
     month: number, 
@@ -103,7 +98,7 @@ interface FinanceContextType {
     accountId: string, 
     amount: number, 
     paymentDate: string
-  ) => void;
+  ) => Promise<void>;
   
   theme: 'light' | 'dark';
   toggleTheme: () => void;
@@ -135,73 +130,177 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const [cardPayments, setCardPayments] = useState<CreditCardPayment[]>([]);
   const [snapshots, setSnapshots] = useState<NetWorthSnapshot[]>([]);
 
-  // Initialize Auth & Data Listener
+  // Carrega todos os dados do usuário a partir do Supabase
+  const loadUserData = async (userId: string, userEmail?: string, userName?: string) => {
+    if (!supabase) return;
+
+    try {
+      // 1. Perfil do Usuário
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      const resolvedName = profileData?.name || userName || userEmail?.split('@')[0] || 'Usuário';
+      const userProfile: Profile = {
+        id: userId,
+        name: resolvedName,
+        email: profileData?.email || userEmail || '',
+        preferences: profileData?.preferences || { theme: 'system', currency: 'BRL' },
+        onboarding_completed: profileData?.onboarding_completed ?? false,
+        onboarding_step: profileData?.onboarding_step ?? 1,
+        financial_goals: profileData?.financial_goals || [],
+        show_onboarding_checklist: profileData?.show_onboarding_checklist ?? true,
+        created_at: profileData?.created_at || new Date().toISOString()
+      };
+      setUser(userProfile);
+
+      // 2. Conta Financeira Familiar / Workspace
+      let finAccId: string | null = null;
+      let activeFinAccount: FinancialAccount | null = null;
+
+      const { data: memberRecords } = await supabase
+        .from('account_members')
+        .select('*, financial_accounts(*)')
+        .eq('user_id', userId)
+        .eq('status', 'active');
+
+      if (memberRecords && memberRecords.length > 0) {
+        finAccId = memberRecords[0].financial_account_id;
+        activeFinAccount = memberRecords[0].financial_accounts as unknown as FinancialAccount;
+      }
+
+      // Se não existir vínculo de conta financeira, busca ou cria uma
+      if (!finAccId) {
+        const { data: existingFin } = await supabase
+          .from('financial_accounts')
+          .select('*')
+          .eq('owner_id', userId)
+          .maybeSingle();
+
+        if (existingFin) {
+          finAccId = existingFin.id;
+          activeFinAccount = existingFin;
+        } else {
+          const { data: newFin } = await supabase
+            .from('financial_accounts')
+            .insert({ name: 'Minhas Finanças', owner_id: userId })
+            .select()
+            .maybeSingle();
+
+          if (newFin) {
+            finAccId = newFin.id;
+            activeFinAccount = newFin;
+            await supabase
+              .from('account_members')
+              .insert({ financial_account_id: finAccId, user_id: userId, role: 'owner', status: 'active' });
+          }
+        }
+      }
+
+      if (activeFinAccount) {
+        setCurrentAccount(activeFinAccount);
+      }
+
+      // 3. Membros e Convites
+      if (finAccId) {
+        const { data: members } = await supabase
+          .from('account_members')
+          .select('*')
+          .eq('financial_account_id', finAccId)
+          .eq('status', 'active');
+        if (members) setAccountMembers(members);
+
+        const { data: invites } = await supabase
+          .from('account_invites')
+          .select('*')
+          .eq('financial_account_id', finAccId);
+        if (invites) setAccountInvites(invites);
+      }
+
+      // 4. Carregar todas as tabelas financeiras online via Supabase
+      const [
+        accountsRes,
+        categoriesRes,
+        transactionsRes,
+        budgetsRes,
+        assetsRes,
+        liabilitiesRes,
+        cardsRes,
+        purchasesRes,
+        snapshotsRes
+      ] = await Promise.all([
+        supabase.from('accounts').select('*').order('created_at', { ascending: true }),
+        supabase.from('categories').select('*').order('name', { ascending: true }),
+        supabase.from('transactions').select('*').order('date', { ascending: false }),
+        supabase.from('budgets').select('*'),
+        supabase.from('assets').select('*').order('created_at', { ascending: true }),
+        supabase.from('liabilities').select('*').order('created_at', { ascending: true }),
+        supabase.from('credit_cards').select('*').order('created_at', { ascending: true }),
+        supabase.from('credit_card_purchases').select('*').order('created_at', { ascending: false }),
+        supabase.from('net_worth_snapshots').select('*').order('snapshot_date', { ascending: true })
+      ]);
+
+      if (accountsRes.data) setAccounts(accountsRes.data);
+      if (categoriesRes.data) setCategories(categoriesRes.data);
+      if (transactionsRes.data) setTransactions(transactionsRes.data);
+      if (budgetsRes.data) setBudgets(budgetsRes.data);
+      if (assetsRes.data) setAssets(assetsRes.data);
+      if (liabilitiesRes.data) setLiabilities(liabilitiesRes.data);
+      if (cardsRes.data) setCreditCards(cardsRes.data);
+      if (purchasesRes.data) setCardPurchases(purchasesRes.data);
+      if (snapshotsRes.data) setSnapshots(snapshotsRes.data);
+
+    } catch (err) {
+      console.error('Erro ao carregar dados do Supabase:', err);
+    }
+  };
+
+  // Inicializa sessão do Supabase Auth
   useEffect(() => {
     let authListener: { subscription: { unsubscribe: () => void } } | null = null;
 
     async function init() {
       setIsLoading(true);
+
       if (isSupabaseConfigured && supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          const registered = getUserProfileFromRegistry(session.user.id) || getUserProfileFromRegistry(session.user.email || '');
-          const isCompleted = session.user.user_metadata?.onboarding_completed === true || registered?.onboarding_completed === true;
-          const currentStep = session.user.user_metadata?.onboarding_step ?? registered?.onboarding_step ?? (isCompleted ? 8 : 1);
-
-          const profile: Profile = {
-            id: session.user.id,
-            name: session.user.user_metadata?.name || registered?.name || session.user.email?.split('@')[0] || 'Usuário',
-            email: session.user.email || '',
-            preferences: { theme: 'system', currency: 'BRL' },
-            onboarding_completed: isCompleted,
-            onboarding_step: currentStep,
-            financial_goals: session.user.user_metadata?.financial_goals || registered?.financial_goals || [],
-            show_onboarding_checklist: registered?.show_onboarding_checklist ?? true,
-            created_at: session.user.created_at
-          };
-          setUser(profile);
-          setLocalUser(profile);
-          loadUserData(profile.id, profile.name, profile.email);
-        } else {
-          setUser(null);
-          setLocalUser(null);
-        }
-
-        const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-          if (event === 'SIGNED_OUT' || !session) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user) {
+            syncAuthCookie(true);
+            await loadUserData(session.user.id, session.user.email, session.user.user_metadata?.name);
+          } else {
             setUser(null);
-            setLocalUser(null);
-          } else if (event === 'SIGNED_IN' && session?.user) {
-            const registered = getUserProfileFromRegistry(session.user.id) || getUserProfileFromRegistry(session.user.email || '');
-            const isCompleted = session.user.user_metadata?.onboarding_completed === true || registered?.onboarding_completed === true;
-            const profile: Profile = {
-              id: session.user.id,
-              name: session.user.user_metadata?.name || registered?.name || session.user.email?.split('@')[0] || 'Usuário',
-              email: session.user.email || '',
-              preferences: { theme: 'system', currency: 'BRL' },
-              onboarding_completed: isCompleted,
-              onboarding_step: session.user.user_metadata?.onboarding_step ?? (isCompleted ? 8 : 1),
-              financial_goals: session.user.user_metadata?.financial_goals || registered?.financial_goals || [],
-              show_onboarding_checklist: registered?.show_onboarding_checklist ?? true,
-              created_at: session.user.created_at
-            };
-            setUser(profile);
-            setLocalUser(profile);
-            loadUserData(profile.id, profile.name, profile.email);
+            syncAuthCookie(false);
           }
-        });
-        authListener = listener;
-      } else {
-        const localU = getLocalUser();
-        if (localU) {
-          setUser(localU);
-          loadUserData(localU.id, localU.name, localU.email);
-        } else {
-          setUser(null);
+
+          const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (event === 'SIGNED_OUT' || !session) {
+              setUser(null);
+              syncAuthCookie(false);
+              setAccounts([]);
+              setCategories([]);
+              setTransactions([]);
+              setBudgets([]);
+              setAssets([]);
+              setLiabilities([]);
+              setCreditCards([]);
+              setCardPurchases([]);
+            } else if (event === 'SIGNED_IN' && session?.user) {
+              syncAuthCookie(true);
+              await loadUserData(session.user.id, session.user.email, session.user.user_metadata?.name);
+            }
+          });
+          authListener = listener;
+        } catch (err) {
+          console.error('Erro ao verificar sessão Supabase:', err);
         }
       }
+
       setIsLoading(false);
     }
+
     init();
 
     return () => {
@@ -209,7 +308,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Sync html theme class
+  // Sincroniza tema dark/light
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const root = document.documentElement;
@@ -225,265 +324,153 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  const loadUserData = (userId: string, userName?: string, userEmail?: string) => {
-    let allFinAccounts = getItem<FinancialAccount[]>('fin_family_accounts', []);
-    let allMembers = getItem<AccountMember[]>('fin_account_members', []);
-    const allInvites = getItem<AccountInvite[]>('fin_account_invites', []);
-
-    // Find active membership record for this specific user
-    let memberRecord = allMembers.find(m => m.user_id === userId && m.status === 'active');
-    let finAccId = memberRecord?.financial_account_id;
-
-    // If user has no membership yet
-    if (!finAccId) {
-      if (userId === DEFAULT_USER_ID) {
-        initializeSeedData(DEFAULT_USER_ID);
-        finAccId = DEFAULT_FINANCIAL_ACCOUNT_ID;
-      } else {
-        finAccId = initializeNewUser(userId, userName || 'Usuário', userEmail || '');
-      }
-      allFinAccounts = getItem<FinancialAccount[]>('fin_family_accounts', []);
-      allMembers = getItem<AccountMember[]>('fin_account_members', []);
-      memberRecord = allMembers.find(m => m.user_id === userId && m.status === 'active');
-    }
-
-    const currentFinAccount = allFinAccounts.find(fa => fa.id === finAccId) || {
-      id: finAccId,
-      name: 'Minha Conta Financeira',
-      owner_id: userId,
-      created_at: new Date().toISOString()
-    };
-
-    setCurrentAccount(currentFinAccount);
-
-    const activeMembers = allMembers.filter(m => m.financial_account_id === finAccId && m.status === 'active');
-    setAccountMembers(activeMembers);
-
-    const activeInvites = allInvites.filter(i => i.financial_account_id === finAccId);
-    setAccountInvites(activeInvites);
-
-    // Load financial data STRICTLY for this financial_account_id
-    const allAccounts = getItem<Account[]>('fin_accounts', []);
-    const allCategories = getItem<Category[]>('fin_categories', []);
-    const allTransactions = getItem<Transaction[]>('fin_transactions', []);
-    const allBudgets = getItem<Budget[]>('fin_budgets', []);
-    const allAssets = getItem<Asset[]>('fin_assets', []);
-    const allLiabilities = getItem<Liability[]>('fin_liabilities', []);
-    const allCards = getItem<CreditCard[]>('fin_credit_cards', []);
-    const allPurchases = getItem<CreditCardPurchase[]>('fin_card_purchases', []);
-    const allPayments = getItem<CreditCardPayment[]>('fin_card_payments', []);
-    const allSnapshots = getItem<NetWorthSnapshot[]>('fin_snapshots', []);
-
-    setAccounts(allAccounts.filter(a => a.financial_account_id === finAccId));
-    setCategories(allCategories.filter(c => c.financial_account_id === finAccId));
-    setTransactions(allTransactions.filter(t => t.financial_account_id === finAccId));
-    setBudgets(allBudgets.filter(b => b.financial_account_id === finAccId));
-    setAssets(allAssets.filter(a => a.financial_account_id === finAccId));
-    setLiabilities(allLiabilities.filter(l => l.financial_account_id === finAccId));
-    setCreditCards(allCards.filter(c => c.financial_account_id === finAccId));
-    setCardPurchases(allPurchases.filter(p => p.financial_account_id === finAccId));
-    setCardPayments(allPayments.filter(pay => pay.financial_account_id === finAccId));
-    setSnapshots(allSnapshots.filter(s => s.financial_account_id === finAccId));
-  };
-
   const setPeriod = (year: number, month: number) => {
     setSelectedYear(year);
     setSelectedMonth(month);
   };
 
-  // Auth Functions
-  const login = async (email: string, pass: string): Promise<boolean> => {
+  // Auth Methods 100% Online Supabase
+  const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
+    if (!supabase) return { success: false, error: 'Supabase não inicializado.' };
     const cleanEmail = email.trim().toLowerCase();
 
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password: pass });
-      if (error || !data.user) return false;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: pass
+      });
 
-      const registered = getUserProfileFromRegistry(data.user.id) || getUserProfileFromRegistry(cleanEmail);
-      const isCompleted = data.user.user_metadata?.onboarding_completed === true || registered?.onboarding_completed === true;
-      const currentStep = data.user.user_metadata?.onboarding_step ?? registered?.onboarding_step ?? (isCompleted ? 8 : 1);
-
-      const profile: Profile = {
-        id: data.user.id,
-        name: data.user.user_metadata?.name || registered?.name || cleanEmail.split('@')[0] || 'Usuário',
-        email: data.user.email || cleanEmail,
-        preferences: { theme: 'system', currency: 'BRL' },
-        onboarding_completed: isCompleted,
-        onboarding_step: currentStep,
-        financial_goals: data.user.user_metadata?.financial_goals || registered?.financial_goals || [],
-        show_onboarding_checklist: registered?.show_onboarding_checklist ?? true,
-        created_at: data.user.created_at
-      };
-      setUser(profile);
-      setLocalUser(profile);
-      loadUserData(profile.id, profile.name, profile.email);
-      return true;
-    } else {
-      // Local development or offline mode
-      const registered = getUserProfileFromRegistry(cleanEmail);
-
-      let profile: Profile;
-      if (registered) {
-        profile = registered;
-      } else if (cleanEmail === 'carlos@exemplo.com' || cleanEmail === 'demo') {
-        profile = {
-          id: DEFAULT_USER_ID,
-          name: 'Carlos Silva',
-          email: 'carlos@exemplo.com',
-          preferences: { theme: 'system', currency: 'BRL' },
-          onboarding_completed: true,
-          onboarding_step: 8,
-          show_onboarding_checklist: true,
-          created_at: new Date().toISOString()
-        };
-      } else {
-        const newUserId = `user-${Date.now()}`;
-        profile = {
-          id: newUserId,
-          name: capitalizeFirstLetter(cleanEmail.split('@')[0]) || 'Usuário',
-          email: cleanEmail,
-          preferences: { theme: 'system', currency: 'BRL' },
-          onboarding_completed: false,
-          onboarding_step: 1,
-          show_onboarding_checklist: true,
-          created_at: new Date().toISOString()
-        };
+      if (error || !data.user) {
+        if (error?.message?.toLowerCase().includes('email not confirmed')) {
+          return { success: false, error: 'E-mail não confirmado. Por favor, acesse sua caixa de entrada e clique no link de ativação enviado pelo Supabase.' };
+        }
+        if (error?.message?.toLowerCase().includes('invalid login credentials')) {
+          return { success: false, error: 'E-mail ou senha incorretos.' };
+        }
+        return { success: false, error: error?.message || 'Falha ao autenticar.' };
       }
 
-      setUser(profile);
-      setLocalUser(profile);
-      loadUserData(profile.id, profile.name, profile.email);
-      return true;
+      syncAuthCookie(true);
+      await loadUserData(data.user.id, data.user.email, data.user.user_metadata?.name);
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao realizar login.';
+      console.error('Exceção no login Supabase:', err);
+      return { success: false, error: msg };
     }
   };
 
-  const signup = async (name: string, email: string, pass: string): Promise<boolean> => {
+  const signup = async (name: string, email: string, pass: string): Promise<{ success: boolean; needsEmailConfirmation?: boolean; error?: string }> => {
+    if (!supabase) return { success: false, error: 'Supabase não inicializado.' };
     const cleanEmail = email.trim().toLowerCase();
     const cleanName = capitalizeFirstLetter(name);
 
-    if (isSupabaseConfigured && supabase) {
+    try {
       const { data, error } = await supabase.auth.signUp({
         email: cleanEmail,
         password: pass,
-        options: { data: { name: cleanName, onboarding_completed: false, onboarding_step: 1 } }
+        options: {
+          data: {
+            name: cleanName,
+            onboarding_completed: false,
+            onboarding_step: 1
+          }
+        }
       });
-      if (error || !data.user) return false;
-      const profile: Profile = {
-        id: data.user.id,
-        name: cleanName,
-        email: cleanEmail,
-        preferences: { theme: 'system', currency: 'BRL' },
-        onboarding_completed: false,
-        onboarding_step: 1,
-        show_onboarding_checklist: true,
-        created_at: data.user.created_at
-      };
-      setUser(profile);
-      setLocalUser(profile);
-      loadUserData(profile.id, profile.name, profile.email);
-      return true;
-    } else {
-      const newUserId = `user-${Date.now()}`;
-      const profile: Profile = {
-        id: newUserId,
-        name: cleanName,
-        email: cleanEmail,
-        preferences: { theme: 'system', currency: 'BRL' },
-        onboarding_completed: false,
-        onboarding_step: 1,
-        show_onboarding_checklist: true,
-        created_at: new Date().toISOString()
-      };
-      setUser(profile);
-      setLocalUser(profile);
-      loadUserData(profile.id, profile.name, profile.email);
-      return true;
+
+      if (error || !data.user) {
+        if (error?.message?.toLowerCase().includes('already registered')) {
+          return { success: false, error: 'Este e-mail já está cadastrado. Tente fazer login.' };
+        }
+        return { success: false, error: error?.message || 'Falha ao criar conta.' };
+      }
+
+      // Se não há sessão ativa imediatamente, o Supabase exige confirmação de e-mail
+      if (!data.session) {
+        return { success: true, needsEmailConfirmation: true };
+      }
+
+      syncAuthCookie(true);
+      await loadUserData(data.user.id, data.user.email, cleanName);
+      return { success: true, needsEmailConfirmation: false };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro no cadastro.';
+      console.error('Exceção no cadastro Supabase:', err);
+      return { success: false, error: msg };
     }
   };
 
   const logout = async () => {
     try {
-      if (isSupabaseConfigured && supabase) {
+      if (supabase) {
         await supabase.auth.signOut();
       }
     } catch (err) {
-      console.error('Logout error:', err);
+      console.error('Erro ao sair:', err);
     } finally {
       setUser(null);
-      setLocalUser(null);
+      syncAuthCookie(false);
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('fin_current_user');
-        // Clear supabase auth tokens if stored in localStorage
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-            localStorage.removeItem(key);
-          }
-        });
-        window.location.replace('/');
+        window.location.replace('/login');
       }
     }
   };
 
-  const updateProfile = (data: Partial<Profile>) => {
-    if (!user) return;
+  const updateProfile = async (data: Partial<Profile>) => {
+    if (!user || !supabase) return;
     const formattedData = {
       ...data,
       name: data.name ? capitalizeFirstLetter(data.name) : user.name
     };
-    const updated = { ...user, ...formattedData };
-    setUser(updated);
-    setLocalUser(updated);
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(formattedData)
+      .eq('id', user.id);
+
+    if (!error) {
+      setUser(prev => prev ? { ...prev, ...formattedData } : null);
+    }
   };
 
   // Onboarding Methods
-  const updateOnboardingStep = (step: number, goals?: string[]) => {
-    if (!user) return;
-    const updated: Profile = {
-      ...user,
-      onboarding_step: step,
-      financial_goals: goals || user.financial_goals
-    };
-    setUser(updated);
-    setLocalUser(updated);
+  const updateOnboardingStep = async (step: number, goals?: string[]) => {
+    if (!user || !supabase) return;
+    const updatedGoals = goals || user.financial_goals;
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.auth.updateUser({
-        data: { onboarding_step: step, financial_goals: goals || user.financial_goals }
-      });
-    }
+    setUser(prev => prev ? { ...prev, onboarding_step: step, financial_goals: updatedGoals } : null);
+
+    await supabase
+      .from('profiles')
+      .update({ onboarding_step: step, financial_goals: updatedGoals })
+      .eq('id', user.id);
   };
 
-  const completeOnboarding = () => {
-    if (!user) return;
-    const updated: Profile = {
-      ...user,
-      onboarding_completed: true,
-      onboarding_step: 8,
-      show_onboarding_checklist: true
-    };
-    setUser(updated);
-    setLocalUser(updated);
+  const completeOnboarding = async () => {
+    if (!user || !supabase) return;
 
-    if (isSupabaseConfigured && supabase) {
-      supabase.auth.updateUser({
-        data: { onboarding_completed: true, onboarding_step: 8 }
-      });
-    }
+    setUser(prev => prev ? { ...prev, onboarding_completed: true, onboarding_step: 8, show_onboarding_checklist: true } : null);
+
+    await supabase
+      .from('profiles')
+      .update({ onboarding_completed: true, onboarding_step: 8, show_onboarding_checklist: true })
+      .eq('id', user.id);
   };
 
-  const hideOnboardingChecklist = () => {
-    if (!user) return;
-    const updated: Profile = {
-      ...user,
-      show_onboarding_checklist: false
-    };
-    setUser(updated);
-    setLocalUser(updated);
+  const hideOnboardingChecklist = async () => {
+    if (!user || !supabase) return;
+
+    setUser(prev => prev ? { ...prev, show_onboarding_checklist: false } : null);
+
+    await supabase
+      .from('profiles')
+      .update({ show_onboarding_checklist: false })
+      .eq('id', user.id);
   };
 
-  // WhatsApp Invite creation with stateless URL-safe token
-  const createWhatsAppInvite = (phone: string, invitedName?: string): string => {
-    if (!user || !currentAccount) return '';
+  // Convites e Contas Compartilhadas via Supabase
+  const createWhatsAppInvite = async (phone: string, invitedName?: string): Promise<string> => {
+    if (!user || !currentAccount || !supabase) return '';
 
     const formattedInvitedName = invitedName ? capitalizeFirstLetter(invitedName) : undefined;
     const token = generateInviteToken({
@@ -493,380 +480,400 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       ownerName: user.name,
       phone: phone,
       invitedName: formattedInvitedName,
-      expiresInMinutes: 15
+      expiresInMinutes: 60 * 24 * 7 // 7 dias
     });
 
     const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 15);
+    expiresAt.setDate(expiresAt.getDate() + 7);
 
-    const newInvite: AccountInvite = {
-      id: `inv-${Date.now()}`,
-      token,
-      financial_account_id: currentAccount.id,
-      created_by: user.id,
-      invited_name: formattedInvitedName,
-      invited_phone: phone,
-      status: 'pending',
-      expires_at: expiresAt.toISOString(),
-      created_at: new Date().toISOString()
-    };
+    const { data: newInvite } = await supabase
+      .from('account_invites')
+      .insert({
+        token,
+        financial_account_id: currentAccount.id,
+        created_by: user.id,
+        invited_name: formattedInvitedName,
+        invited_phone: phone,
+        status: 'pending',
+        expires_at: expiresAt.toISOString()
+      })
+      .select()
+      .maybeSingle();
 
-    const allInvites = getItem<AccountInvite[]>('fin_account_invites', []);
-    const updatedInvites = [newInvite, ...allInvites];
-    setItem('fin_account_invites', updatedInvites);
-    setAccountInvites(updatedInvites.filter(i => i.financial_account_id === currentAccount.id));
+    if (newInvite) {
+      setAccountInvites(prev => [newInvite, ...prev]);
+    }
 
-    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://saasfinancas20.vercel.app';
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://minhascontas-seven.vercel.app';
     const inviteUrl = `${origin}/convite/${token}`;
 
     return createWhatsAppShareUrl(phone, inviteUrl, currentAccount.name, formattedInvitedName);
   };
 
   const acceptInviteToken = async (token: string): Promise<boolean> => {
-    if (!user) return false;
+    if (!user || !supabase) return false;
 
-    // 1. Try decoding stateless self-contained token first
+    // Decodifica token
     const decoded = decodeInviteToken(token);
-    if (decoded.isValid) {
-      if (decoded.isExpired) {
+    let targetAccId = decoded.accId;
+
+    if (!targetAccId) {
+      const { data: invite } = await supabase
+        .from('account_invites')
+        .select('*')
+        .eq('token', token)
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      if (!invite || new Date(invite.expires_at) < new Date()) {
         return false;
       }
+      targetAccId = invite.financial_account_id;
+    }
 
-      const targetAccId = decoded.accId!;
-      const targetAccName = decoded.accName!;
-      const targetOwnerId = decoded.ownerId || user.id;
+    if (!targetAccId) return false;
 
-      // Ensure the financial account exists in storage
-      const allFinAccounts = getItem<FinancialAccount[]>('fin_family_accounts', []);
-      const existingAcc = allFinAccounts.find(fa => fa.id === targetAccId);
-      if (!existingAcc) {
-        const newAcc: FinancialAccount = {
-          id: targetAccId,
-          name: targetAccName,
-          owner_id: targetOwnerId,
-          created_at: new Date().toISOString()
-        };
-        setItem('fin_family_accounts', [...allFinAccounts, newAcc]);
-      }
+    // Associa usuário à conta familiar
+    const { error } = await supabase
+      .from('account_members')
+      .insert({
+        financial_account_id: targetAccId,
+        user_id: user.id,
+        role: 'member',
+        status: 'active'
+      });
 
-      // Bind user to financial account as member
-      const allMembers = getItem<AccountMember[]>('fin_account_members', []);
-      const alreadyMember = allMembers.some(m => m.financial_account_id === targetAccId && m.user_id === user.id);
+    if (!error) {
+      await supabase
+        .from('account_invites')
+        .update({ status: 'accepted', accepted_by: user.id })
+        .eq('token', token);
 
-      if (!alreadyMember) {
-        const newMember: AccountMember = {
-          id: `mem-${Date.now()}`,
-          financial_account_id: targetAccId,
-          user_id: user.id,
-          role: 'member',
-          status: 'active',
-          user_name: user.name,
-          user_email: user.email,
-          created_at: new Date().toISOString()
-        };
-        setItem('fin_account_members', [...allMembers, newMember]);
-      }
-
-      loadUserData(user.id, user.name, user.email);
+      await loadUserData(user.id, user.email, user.name);
       return true;
     }
 
-    // 2. Fallback to legacy local storage invites
-    const allInvites = getItem<AccountInvite[]>('fin_account_invites', []);
-    const invite = allInvites.find(i => i.token === token && i.status === 'pending');
-
-    if (!invite) return false;
-
-    if (new Date(invite.expires_at) < new Date()) {
-      return false;
-    }
-
-    const updatedInvites = allInvites.map(i => 
-      i.token === token ? { ...i, status: 'accepted' as const, accepted_by: user.id } : i
-    );
-    setItem('fin_account_invites', updatedInvites);
-
-    const allMembers = getItem<AccountMember[]>('fin_account_members', []);
-    const alreadyMember = allMembers.some(m => m.financial_account_id === invite.financial_account_id && m.user_id === user.id);
-
-    if (!alreadyMember) {
-      const newMember: AccountMember = {
-        id: `mem-${Date.now()}`,
-        financial_account_id: invite.financial_account_id,
-        user_id: user.id,
-        role: 'member',
-        status: 'active',
-        user_name: user.name,
-        user_email: user.email,
-        created_at: new Date().toISOString()
-      };
-      setItem('fin_account_members', [...allMembers, newMember]);
-    }
-
-    loadUserData(user.id, user.name, user.email);
-    return true;
+    return false;
   };
 
-  const removeMember = (memberId: string) => {
-    if (!user || !currentAccount) return;
-    const allMembers = getItem<AccountMember[]>('fin_account_members', []);
-    const updatedMembers = allMembers.filter(m => m.id !== memberId);
-    setItem('fin_account_members', updatedMembers);
-    setAccountMembers(updatedMembers.filter(m => m.financial_account_id === currentAccount.id));
+  const removeMember = async (memberId: string) => {
+    if (!supabase) return;
+    const { error } = await supabase.from('account_members').delete().eq('id', memberId);
+    if (!error) {
+      setAccountMembers(prev => prev.filter(m => m.id !== memberId));
+    }
   };
 
-  const leaveAccount = () => {
-    if (!user || !currentAccount) return;
-    const allMembers = getItem<AccountMember[]>('fin_account_members', []);
-    const updatedMembers = allMembers.filter(m => !(m.financial_account_id === currentAccount.id && m.user_id === user.id));
-    setItem('fin_account_members', updatedMembers);
-    loadUserData(user.id, user.name, user.email);
+  const leaveAccount = async () => {
+    if (!user || !currentAccount || !supabase) return;
+    await supabase
+      .from('account_members')
+      .delete()
+      .eq('financial_account_id', currentAccount.id)
+      .eq('user_id', user.id);
+
+    await loadUserData(user.id, user.email, user.name);
     if (typeof window !== 'undefined') {
       window.location.replace('/');
     }
   };
 
-  const updateFinancialAccountName = (newName: string) => {
-    if (!currentAccount) return;
+  const updateFinancialAccountName = async (newName: string) => {
+    if (!currentAccount || !supabase) return;
     const formattedName = capitalizeFirstLetter(newName);
-    const allFinAccounts = getItem<FinancialAccount[]>('fin_family_accounts', []);
-    const updated = allFinAccounts.map(fa => fa.id === currentAccount.id ? { ...fa, name: formattedName } : fa);
-    setItem('fin_family_accounts', updated);
-    setCurrentAccount(prev => prev ? { ...prev, name: formattedName } : null);
+
+    const { error } = await supabase
+      .from('financial_accounts')
+      .update({ name: formattedName })
+      .eq('id', currentAccount.id);
+
+    if (!error) {
+      setCurrentAccount(prev => prev ? { ...prev, name: formattedName } : null);
+    }
   };
 
-  // CRUD Implementations with auto-capitalization of text descriptions & names
-  const addTransaction = (tx: Omit<Transaction, 'id' | 'user_id'>) => {
-    if (!user || !currentAccount) return;
-    const newTx: Transaction = {
+  // ==========================================
+  // OPERAÇÕES FINANCEIRAS 100% ONLINE (SUPABASE)
+  // ==========================================
+
+  const addTransaction = async (tx: Omit<Transaction, 'id' | 'user_id'>) => {
+    if (!user || !supabase) return;
+
+    const payload = {
       ...tx,
-      id: `tx-${Date.now()}`,
       user_id: user.id,
-      financial_account_id: currentAccount.id,
-      created_by: user.id,
-      created_by_name: user.name,
+      financial_account_id: currentAccount?.id || null,
       description: capitalizeFirstLetter(tx.description),
-      notes: tx.notes ? capitalizeFirstLetter(tx.notes) : undefined,
-      created_at: new Date().toISOString()
+      notes: tx.notes ? capitalizeFirstLetter(tx.notes) : null
     };
-    const all = getItem<Transaction[]>('fin_transactions', []);
-    const updatedAll = [newTx, ...all];
-    setItem('fin_transactions', updatedAll);
-    setTransactions(updatedAll.filter(t => t.financial_account_id === currentAccount.id));
+
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert(payload)
+      .select()
+      .maybeSingle();
+
+    if (!error && data) {
+      setTransactions(prev => [data, ...prev]);
+    } else if (error) {
+      console.error('Erro ao adicionar transação no Supabase:', error.message);
+    }
   };
 
-  const updateTransaction = (id: string, updatedFields: Partial<Transaction>) => {
-    if (!user || !currentAccount) return;
-    const all = getItem<Transaction[]>('fin_transactions', []);
-    const updatedAll = all.map(t => {
-      if (t.id === id) {
-        return {
-          ...t,
-          ...updatedFields,
-          description: updatedFields.description !== undefined ? capitalizeFirstLetter(updatedFields.description) : t.description,
-          notes: updatedFields.notes !== undefined ? (updatedFields.notes ? capitalizeFirstLetter(updatedFields.notes) : undefined) : t.notes
-        };
-      }
-      return t;
-    });
-    setItem('fin_transactions', updatedAll);
-    setTransactions(updatedAll.filter(t => t.financial_account_id === currentAccount.id));
+  const updateTransaction = async (id: string, updatedFields: Partial<Transaction>) => {
+    if (!supabase) return;
+
+    const payload = {
+      ...updatedFields,
+      description: updatedFields.description !== undefined ? capitalizeFirstLetter(updatedFields.description) : undefined,
+      notes: updatedFields.notes !== undefined ? (updatedFields.notes ? capitalizeFirstLetter(updatedFields.notes) : null) : undefined
+    };
+
+    const { error } = await supabase
+      .from('transactions')
+      .update(payload)
+      .eq('id', id);
+
+    if (!error) {
+      setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...payload } : t));
+    }
   };
 
-  const deleteTransaction = (id: string) => {
-    if (!user || !currentAccount) return;
-    const all = getItem<Transaction[]>('fin_transactions', []);
-    const updatedAll = all.filter(t => t.id !== id);
-    setItem('fin_transactions', updatedAll);
-    setTransactions(updatedAll.filter(t => t.financial_account_id === currentAccount.id));
+  const deleteTransaction = async (id: string) => {
+    if (!supabase) return;
+    const { error } = await supabase.from('transactions').delete().eq('id', id);
+    if (!error) {
+      setTransactions(prev => prev.filter(t => t.id !== id));
+    }
   };
 
-  const addAccount = (acc: Omit<Account, 'id' | 'user_id'>) => {
-    if (!user || !currentAccount) return;
-    const newAcc: Account = {
+  const addAccount = async (acc: Omit<Account, 'id' | 'user_id'>) => {
+    if (!user || !supabase) return;
+
+    const payload = {
       ...acc,
-      id: `acc-${Date.now()}`,
       user_id: user.id,
-      financial_account_id: currentAccount.id,
-      created_by: user.id,
+      financial_account_id: currentAccount?.id || null,
       name: capitalizeFirstLetter(acc.name),
-      financial_institution: acc.financial_institution ? capitalizeFirstLetter(acc.financial_institution) : undefined
+      financial_institution: acc.financial_institution ? capitalizeFirstLetter(acc.financial_institution) : null
     };
-    const all = getItem<Account[]>('fin_accounts', []);
-    const updatedAll = [...all, newAcc];
-    setItem('fin_accounts', updatedAll);
-    setAccounts(updatedAll.filter(a => a.financial_account_id === currentAccount.id));
+
+    const { data, error } = await supabase
+      .from('accounts')
+      .insert(payload)
+      .select()
+      .maybeSingle();
+
+    if (!error && data) {
+      setAccounts(prev => [...prev, data]);
+    }
   };
 
-  const updateAccount = (id: string, accFields: Partial<Account>) => {
-    if (!user || !currentAccount) return;
-    const all = getItem<Account[]>('fin_accounts', []);
-    const updatedAll = all.map(a => {
-      if (a.id === id) {
-        return {
-          ...a,
-          ...accFields,
-          name: accFields.name !== undefined ? capitalizeFirstLetter(accFields.name) : a.name,
-          financial_institution: accFields.financial_institution !== undefined ? (accFields.financial_institution ? capitalizeFirstLetter(accFields.financial_institution) : undefined) : a.financial_institution
-        };
-      }
-      return a;
-    });
-    setItem('fin_accounts', updatedAll);
-    setAccounts(updatedAll.filter(a => a.financial_account_id === currentAccount.id));
+  const updateAccount = async (id: string, accFields: Partial<Account>) => {
+    if (!supabase) return;
+
+    const payload = {
+      ...accFields,
+      name: accFields.name !== undefined ? capitalizeFirstLetter(accFields.name) : undefined,
+      financial_institution: accFields.financial_institution !== undefined ? (accFields.financial_institution ? capitalizeFirstLetter(accFields.financial_institution) : null) : undefined
+    };
+
+    const { error } = await supabase
+      .from('accounts')
+      .update(payload)
+      .eq('id', id);
+
+    if (!error) {
+      setAccounts(prev => prev.map(a => a.id === id ? { ...a, ...payload } : a));
+    }
   };
 
-  const deleteAccount = (id: string) => {
-    if (!user || !currentAccount) return;
-    const all = getItem<Account[]>('fin_accounts', []);
-    const updatedAll = all.filter(a => a.id !== id);
-    setItem('fin_accounts', updatedAll);
-    setAccounts(updatedAll.filter(a => a.financial_account_id === currentAccount.id));
+  const deleteAccount = async (id: string) => {
+    if (!supabase) return;
+    const { error } = await supabase.from('accounts').delete().eq('id', id);
+    if (!error) {
+      setAccounts(prev => prev.filter(a => a.id !== id));
+    }
   };
 
-  const addCategory = (cat: Omit<Category, 'id' | 'user_id'>) => {
-    if (!user || !currentAccount) return;
-    const newCat: Category = {
+  const addCategory = async (cat: Omit<Category, 'id' | 'user_id'>) => {
+    if (!user || !supabase) return;
+
+    const payload = {
       ...cat,
-      id: `cat-${Date.now()}`,
       user_id: user.id,
-      financial_account_id: currentAccount.id,
+      financial_account_id: currentAccount?.id || null,
       name: capitalizeFirstLetter(cat.name)
     };
-    const all = getItem<Category[]>('fin_categories', []);
-    const updatedAll = [...all, newCat];
-    setItem('fin_categories', updatedAll);
-    setCategories(updatedAll.filter(c => c.financial_account_id === currentAccount.id));
+
+    const { data, error } = await supabase
+      .from('categories')
+      .insert(payload)
+      .select()
+      .maybeSingle();
+
+    if (!error && data) {
+      setCategories(prev => [...prev, data]);
+    }
   };
 
-  const updateCategory = (id: string, catFields: Partial<Category>) => {
-    if (!user || !currentAccount) return;
-    const all = getItem<Category[]>('fin_categories', []);
-    const updatedAll = all.map(c => {
-      if (c.id === id) {
-        return {
-          ...c,
-          ...catFields,
-          name: catFields.name !== undefined ? capitalizeFirstLetter(catFields.name) : c.name
-        };
-      }
-      return c;
-    });
-    setItem('fin_categories', updatedAll);
-    setCategories(updatedAll.filter(c => c.financial_account_id === currentAccount.id));
+  const updateCategory = async (id: string, catFields: Partial<Category>) => {
+    if (!supabase) return;
+
+    const payload = {
+      ...catFields,
+      name: catFields.name !== undefined ? capitalizeFirstLetter(catFields.name) : undefined
+    };
+
+    const { error } = await supabase
+      .from('categories')
+      .update(payload)
+      .eq('id', id);
+
+    if (!error) {
+      setCategories(prev => prev.map(c => c.id === id ? { ...c, ...payload } : c));
+    }
   };
 
-  const deleteCategory = (id: string) => {
-    if (!user || !currentAccount) return;
-    const all = getItem<Category[]>('fin_categories', []);
-    const updatedAll = all.filter(c => c.id !== id);
-    setItem('fin_categories', updatedAll);
-    setCategories(updatedAll.filter(c => c.financial_account_id === currentAccount.id));
+  const deleteCategory = async (id: string) => {
+    if (!supabase) return;
+    const { error } = await supabase.from('categories').delete().eq('id', id);
+    if (!error) {
+      setCategories(prev => prev.filter(c => c.id !== id));
+    }
   };
 
-  const setBudgetAmount = (categoryId: string, amount: number) => {
-    if (!user || !currentAccount) return;
-    const all = getItem<Budget[]>('fin_budgets', []);
-    const existingIdx = all.findIndex(
-      b => b.financial_account_id === currentAccount.id && b.category_id === categoryId && b.month === selectedMonth && b.year === selectedYear
+  const setBudgetAmount = async (categoryId: string, amount: number) => {
+    if (!user || !supabase) return;
+
+    const existingBudget = budgets.find(
+      b => b.category_id === categoryId && b.month === selectedMonth && b.year === selectedYear
     );
 
-    let updatedAll: Budget[];
-    if (existingIdx >= 0) {
-      updatedAll = all.map((b, idx) => (idx === existingIdx ? { ...b, amount } : b));
+    if (existingBudget) {
+      const { error } = await supabase
+        .from('budgets')
+        .update({ amount })
+        .eq('id', existingBudget.id);
+
+      if (!error) {
+        setBudgets(prev => prev.map(b => b.id === existingBudget.id ? { ...b, amount } : b));
+      }
     } else {
-      const newB: Budget = {
-        id: `b-${Date.now()}`,
+      const payload = {
         user_id: user.id,
-        financial_account_id: currentAccount.id,
+        financial_account_id: currentAccount?.id || null,
         category_id: categoryId,
         month: selectedMonth,
         year: selectedYear,
         amount
       };
-      updatedAll = [...all, newB];
+
+      const { data, error } = await supabase
+        .from('budgets')
+        .insert(payload)
+        .select()
+        .maybeSingle();
+
+      if (!error && data) {
+        setBudgets(prev => [...prev, data]);
+      }
     }
-    setItem('fin_budgets', updatedAll);
-    setBudgets(updatedAll.filter(b => b.financial_account_id === currentAccount.id));
   };
 
-  const addAsset = (asset: Omit<Asset, 'id' | 'user_id'>) => {
-    if (!user || !currentAccount) return;
-    const newAsset: Asset = { 
-      ...asset, 
-      id: `asset-${Date.now()}`, 
-      user_id: user.id, 
-      financial_account_id: currentAccount.id, 
-      created_by: user.id,
-      name: capitalizeFirstLetter(asset.name),
-      notes: asset.notes ? capitalizeFirstLetter(asset.notes) : undefined
-    };
-    const all = getItem<Asset[]>('fin_assets', []);
-    const updatedAll = [...all, newAsset];
-    setItem('fin_assets', updatedAll);
-    setAssets(updatedAll.filter(a => a.financial_account_id === currentAccount.id));
-  };
+  const addAsset = async (asset: Omit<Asset, 'id' | 'user_id'>) => {
+    if (!user || !supabase) return;
 
-  const deleteAsset = (id: string) => {
-    if (!user || !currentAccount) return;
-    const all = getItem<Asset[]>('fin_assets', []);
-    const updatedAll = all.filter(a => a.id !== id);
-    setItem('fin_assets', updatedAll);
-    setAssets(updatedAll.filter(a => a.financial_account_id === currentAccount.id));
-  };
-
-  const addLiability = (liability: Omit<Liability, 'id' | 'user_id'>) => {
-    if (!user || !currentAccount) return;
-    const newLiab: Liability = { 
-      ...liability, 
-      id: `liab-${Date.now()}`, 
-      user_id: user.id, 
-      financial_account_id: currentAccount.id, 
-      created_by: user.id,
-      name: capitalizeFirstLetter(liability.name),
-      notes: liability.notes ? capitalizeFirstLetter(liability.notes) : undefined
-    };
-    const all = getItem<Liability[]>('fin_liabilities', []);
-    const updatedAll = [...all, newLiab];
-    setItem('fin_liabilities', updatedAll);
-    setLiabilities(updatedAll.filter(l => l.financial_account_id === currentAccount.id));
-  };
-
-  const deleteLiability = (id: string) => {
-    if (!user || !currentAccount) return;
-    const all = getItem<Liability[]>('fin_liabilities', []);
-    const updatedAll = all.filter(l => l.id !== id);
-    setItem('fin_liabilities', updatedAll);
-    setLiabilities(updatedAll.filter(l => l.financial_account_id === currentAccount.id));
-  };
-
-  // Credit Card Methods
-  const addCreditCard = (card: Omit<CreditCard, 'id' | 'user_id'>) => {
-    if (!user || !currentAccount) return;
-    const newCard: CreditCard = {
-      ...card,
-      id: `card-${Date.now()}`,
+    const payload = {
+      ...asset,
       user_id: user.id,
-      financial_account_id: currentAccount.id,
-      created_by: user.id,
-      name: capitalizeFirstLetter(card.name),
-      issuer: card.issuer ? capitalizeFirstLetter(card.issuer) : (card.brand ? capitalizeFirstLetter(card.brand) : 'Cartão')
+      financial_account_id: currentAccount?.id || null,
+      name: capitalizeFirstLetter(asset.name),
+      notes: asset.notes ? capitalizeFirstLetter(asset.notes) : null
     };
-    const all = getItem<CreditCard[]>('fin_credit_cards', []);
-    const updatedAll = [...all, newCard];
-    setItem('fin_credit_cards', updatedAll);
-    setCreditCards(updatedAll.filter(c => c.financial_account_id === currentAccount.id));
+
+    const { data, error } = await supabase
+      .from('assets')
+      .insert(payload)
+      .select()
+      .maybeSingle();
+
+    if (!error && data) {
+      setAssets(prev => [...prev, data]);
+    }
   };
 
-  const deleteCreditCard = (id: string) => {
-    if (!user || !currentAccount) return;
-    const all = getItem<CreditCard[]>('fin_credit_cards', []);
-    const updatedAll = all.filter(c => c.id !== id);
-    setItem('fin_credit_cards', updatedAll);
-    setCreditCards(updatedAll.filter(c => c.financial_account_id === currentAccount.id));
+  const deleteAsset = async (id: string) => {
+    if (!supabase) return;
+    const { error } = await supabase.from('assets').delete().eq('id', id);
+    if (!error) {
+      setAssets(prev => prev.filter(a => a.id !== id));
+    }
   };
 
-  const addCreditCardPurchase = (
+  const addLiability = async (liability: Omit<Liability, 'id' | 'user_id'>) => {
+    if (!user || !supabase) return;
+
+    const payload = {
+      ...liability,
+      user_id: user.id,
+      financial_account_id: currentAccount?.id || null,
+      name: capitalizeFirstLetter(liability.name),
+      notes: liability.notes ? capitalizeFirstLetter(liability.notes) : null
+    };
+
+    const { data, error } = await supabase
+      .from('liabilities')
+      .insert(payload)
+      .select()
+      .maybeSingle();
+
+    if (!error && data) {
+      setLiabilities(prev => [...prev, data]);
+    }
+  };
+
+  const deleteLiability = async (id: string) => {
+    if (!supabase) return;
+    const { error } = await supabase.from('liabilities').delete().eq('id', id);
+    if (!error) {
+      setLiabilities(prev => prev.filter(l => l.id !== id));
+    }
+  };
+
+  // Cartões de Crédito
+  const addCreditCard = async (card: Omit<CreditCard, 'id' | 'user_id'>) => {
+    if (!user || !supabase) return;
+
+    const payload = {
+      ...card,
+      user_id: user.id,
+      financial_account_id: currentAccount?.id || null,
+      name: capitalizeFirstLetter(card.name),
+      brand: card.brand || 'Mastercard',
+      color: card.color || '#6366f1'
+    };
+
+    const { data, error } = await supabase
+      .from('credit_cards')
+      .insert(payload)
+      .select()
+      .maybeSingle();
+
+    if (!error && data) {
+      setCreditCards(prev => [...prev, data]);
+    }
+  };
+
+  const deleteCreditCard = async (id: string) => {
+    if (!supabase) return;
+    const { error } = await supabase.from('credit_cards').delete().eq('id', id);
+    if (!error) {
+      setCreditCards(prev => prev.filter(c => c.id !== id));
+    }
+  };
+
+  const addCreditCardPurchase = async (
     cardId: string,
     description: string,
     totalAmount: number,
@@ -874,12 +881,34 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     purchaseDate: string,
     categoryId?: string
   ) => {
-    if (!user || !currentAccount) return;
+    if (!user || !supabase) return;
+
     const card = creditCards.find(c => c.id === cardId);
     if (!card) return;
 
     const formattedDesc = capitalizeFirstLetter(description);
 
+    // 1. Salva compra geral
+    const { data: purchaseData } = await supabase
+      .from('credit_card_purchases')
+      .insert({
+        user_id: user.id,
+        financial_account_id: currentAccount?.id || null,
+        credit_card_id: cardId,
+        category_id: categoryId || null,
+        description: formattedDesc,
+        total_amount: totalAmount,
+        installments_count: installments,
+        purchase_date: purchaseDate
+      })
+      .select()
+      .maybeSingle();
+
+    if (purchaseData) {
+      setCardPurchases(prev => [purchaseData, ...prev]);
+    }
+
+    // 2. Gera as parcelas em transactions vinculadas ao cartão
     const generated = generateInstallmentPurchases(
       card,
       formattedDesc,
@@ -890,21 +919,32 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       user.id
     );
 
-    const fullPurchases: CreditCardPurchase[] = generated.map((p, idx) => ({
-      ...p,
-      id: `pur-${Date.now()}-${idx + 1}`,
-      financial_account_id: currentAccount.id,
-      created_by: user.id,
-      created_by_name: user.name
+    const transactionsPayload = generated.map((p, idx) => ({
+      user_id: user.id,
+      financial_account_id: currentAccount?.id || null,
+      credit_card_id: cardId,
+      category_id: categoryId || null,
+      description: `${formattedDesc} (${idx + 1}/${installments})`,
+      amount: p.amount,
+      date: p.purchase_date,
+      type: 'expense' as const,
+      status: 'completed' as const,
+      payment_method: 'credit_card',
+      installment_number: idx + 1,
+      total_installments: installments
     }));
 
-    const allPurchases = getItem<CreditCardPurchase[]>('fin_card_purchases', []);
-    const updatedPurchases = [...fullPurchases, ...allPurchases];
-    setItem('fin_card_purchases', updatedPurchases);
-    setCardPurchases(updatedPurchases.filter(p => p.financial_account_id === currentAccount.id));
+    const { data: insertedTxs } = await supabase
+      .from('transactions')
+      .insert(transactionsPayload)
+      .select();
+
+    if (insertedTxs) {
+      setTransactions(prev => [...insertedTxs, ...prev]);
+    }
   };
 
-  const payInvoice = (
+  const payInvoice = async (
     cardId: string,
     month: number,
     year: number,
@@ -912,25 +952,25 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     amount: number,
     paymentDate: string
   ) => {
-    if (!user || !currentAccount) return;
-    const newPayment: CreditCardPayment = {
-      id: `pay-${Date.now()}`,
-      user_id: user.id,
-      financial_account_id: currentAccount.id,
-      created_by: user.id,
-      invoice_id: `inv-${cardId}-${year}-${month}`,
-      account_id: accountId,
-      amount,
-      payment_date: paymentDate
-    };
+    if (!user || !supabase) return;
 
-    const allPayments = getItem<CreditCardPayment[]>('fin_card_payments', []);
-    const updatedPayments = [newPayment, ...allPayments];
-    setItem('fin_card_payments', updatedPayments);
-    setCardPayments(updatedPayments.filter(p => p.financial_account_id === currentAccount.id));
+    // 1. Registra pagamento em credit_card_invoices
+    await supabase
+      .from('credit_card_invoices')
+      .upsert({
+        user_id: user.id,
+        financial_account_id: currentAccount?.id || null,
+        credit_card_id: cardId,
+        month,
+        year,
+        closing_date: `${year}-${String(month).padStart(2, '0')}-01`,
+        due_date: paymentDate,
+        status: 'paid',
+        paid_amount: amount
+      });
 
-    // Register invoice payment transaction in transactions to deduct checking account balance ONLY
-    addTransaction({
+    // 2. Debita da conta corrente selecionada
+    await addTransaction({
       account_id: accountId,
       description: `Pagamento Fatura Cartão (${month}/${year})`,
       amount,
@@ -938,20 +978,16 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       type: 'expense',
       status: 'completed',
       payment_method: 'credit_card_payment',
-      notes: 'Pagamento de fatura de cartão de crédito (não contabilizado em categorias para evitar duplicação)'
+      notes: 'Pagamento de fatura de cartão de crédito (fatura baixada online)'
     });
   };
 
-  // Re-calculate accounts with balances
+  // Cálculos dinâmicos em memória (re-renderiza com dados do Supabase)
   const accountsWithBalances = calculateAccountBalances(accounts, transactions);
 
-  // Credit Card limit calculations
   const cardsWithCalculatedLimits = creditCards.map(card => {
     const cardPurchasesList = cardPurchases.filter(p => p.credit_card_id === card.id);
-    const cardPaymentsList = cardPayments.filter(p => {
-      return p.invoice_id.startsWith(`inv-${card.id}`);
-    });
-
+    const cardPaymentsList = cardPayments.filter(p => p.invoice_id?.startsWith(`inv-${card.id}`));
     const limits = calculateCardLimits(card, cardPurchasesList, cardPaymentsList);
     return {
       ...card,
@@ -961,12 +997,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     };
   });
 
-  // Calculate total credit committed to include in liabilities for Net Worth
   const totalCreditCommitted = cardsWithCalculatedLimits.reduce(
     (acc, card) => acc + (card.committed_limit || 0), 0
   );
 
-  // Financial summary
   const summary = calculateFinancialSummary(
     accounts,
     transactions,
@@ -1043,7 +1077,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
 export function useFinance() {
   const context = useContext(FinanceContext);
   if (!context) {
-    throw new Error('useFinance must be used within a FinanceProvider');
+    throw new Error('useFinance deve ser usado dentro de um FinanceProvider');
   }
   return context;
 }
