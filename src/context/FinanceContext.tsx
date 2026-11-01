@@ -382,6 +382,12 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         if (error?.message?.toLowerCase().includes('already registered')) {
           return { success: false, error: 'Este e-mail já está cadastrado. Tente fazer login.' };
         }
+        if (error?.message?.toLowerCase().includes('rate limit')) {
+          return { 
+            success: false, 
+            error: 'Limite de e-mails atingido no Supabase. Desative a opção "Confirm email" no painel do Supabase (Authentication > Providers > Email) para cadastrar na hora sem limite.' 
+          };
+        }
         return { success: false, error: error?.message || 'Falha ao criar conta.' };
       }
 
