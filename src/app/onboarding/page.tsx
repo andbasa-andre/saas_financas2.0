@@ -104,12 +104,12 @@ export default function OnboardingPage() {
   const [cardBrand, setCardBrand] = useState('Mastercard');
   const [addedCardsCount, setAddedCardsCount] = useState(0);
 
-  const handleAddCard = (e: React.FormEvent) => {
+  const handleAddCard = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cardName.trim()) return;
     const lim = parseFloat(cardLimit.replace(',', '.')) || 1000;
 
-    addCreditCard({
+    await addCreditCard({
       name: cardName.trim(),
       issuer: cardBrand,
       last_four_digits: cardDigits || '1234',

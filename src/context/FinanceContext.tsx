@@ -853,23 +853,52 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const addCreditCard = async (card: Omit<CreditCard, 'id' | 'user_id'>) => {
     if (!user || !supabase) return;
 
-    const payload = {
-      ...card,
+    const basePayload = {
       user_id: user.id,
       financial_account_id: currentAccount?.id || null,
       name: capitalizeFirstLetter(card.name),
       brand: card.brand || 'Mastercard',
-      color: card.color || '#6366f1'
+      color: card.color || '#6366f1',
+      limit_amount: Number(card.limit_amount) || 0,
+      closing_day: Number(card.closing_day) || 5,
+      due_day: Number(card.due_day) || 12,
+      account_id: card.account_id || null
     };
 
-    const { data, error } = await supabase
+    const fullPayload = {
+      ...basePayload,
+      issuer: card.issuer || 'Banco',
+      last_four_digits: card.last_four_digits || '0000',
+      is_active: card.is_active ?? true
+    };
+
+    let { data, error } = await supabase
       .from('credit_cards')
-      .insert(payload)
+      .insert(fullPayload)
       .select()
       .maybeSingle();
 
-    if (!error && data) {
-      setCreditCards(prev => [...prev, data]);
+    if (error && (error.message?.includes('column') || error.code === 'PGRST204')) {
+      console.warn('Tabela credit_cards sem colunas estendidas, usando payload base:', error.message);
+      const retry = await supabase
+        .from('credit_cards')
+        .insert(basePayload)
+        .select()
+        .maybeSingle();
+      data = retry.data;
+      error = retry.error;
+    }
+
+    if (error) {
+      console.error('Erro ao adicionar cartão no Supabase:', error.message);
+    } else if (data) {
+      const mergedCard: CreditCard = {
+        issuer: card.issuer || 'Banco',
+        last_four_digits: card.last_four_digits || '0000',
+        is_active: card.is_active ?? true,
+        ...data
+      };
+      setCreditCards(prev => [...prev, mergedCard]);
     }
   };
 

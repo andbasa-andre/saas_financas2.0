@@ -105,12 +105,12 @@ export default function CreditCardsPage() {
     });
   }
 
-  const handleCreateCard = (e: React.FormEvent) => {
+  const handleCreateCard = async (e: React.FormEvent) => {
     e.preventDefault();
     const lim = parseFloat(cardLimit.replace(',', '.'));
     if (!cardName.trim() || isNaN(lim) || lim <= 0) return;
 
-    addCreditCard({
+    await addCreditCard({
       name: cardName.trim(),
       issuer: cardIssuer.trim() || 'Banco',
       last_four_digits: last4.trim() || '0000',
@@ -128,13 +128,13 @@ export default function CreditCardsPage() {
     setIsAddCardOpen(false);
   };
 
-  const handleCreatePurchase = (e: React.FormEvent) => {
+  const handleCreatePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeCard) return;
     const amt = parseFloat(purAmount.replace(',', '.'));
     if (!purDesc.trim() || isNaN(amt) || amt <= 0) return;
 
-    addCreditCardPurchase(
+    await addCreditCardPurchase(
       activeCard.id,
       purDesc.trim(),
       amt,
@@ -149,13 +149,13 @@ export default function CreditCardsPage() {
     setIsAddPurchaseOpen(false);
   };
 
-  const handlePayInvoiceSubmit = (e: React.FormEvent) => {
+  const handlePayInvoiceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeCard || !payAccount) return;
     const val = parseFloat(payAmountInput.replace(',', '.')) || invoiceRemainingAmount;
     if (val <= 0) return;
 
-    payInvoice(
+    await payInvoice(
       activeCard.id,
       selectedMonth,
       selectedYear,
