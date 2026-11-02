@@ -629,10 +629,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const updateTransaction = async (id: string, updatedFields: Partial<Transaction>) => {
     if (!supabase) return;
 
-    const payload = {
+    const payload: Partial<Transaction> = {
       ...updatedFields,
-      description: updatedFields.description !== undefined ? capitalizeFirstLetter(updatedFields.description) : undefined,
-      notes: updatedFields.notes !== undefined ? (updatedFields.notes ? capitalizeFirstLetter(updatedFields.notes) : null) : undefined
+      ...(updatedFields.description !== undefined ? { description: capitalizeFirstLetter(updatedFields.description) } : {}),
+      ...(updatedFields.notes !== undefined ? { notes: updatedFields.notes ? capitalizeFirstLetter(updatedFields.notes) : null } : {})
     };
 
     const { error } = await supabase
@@ -641,7 +641,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       .eq('id', id);
 
     if (!error) {
-      setTransactions(prev => prev.map(t => t.id === id ? { ...t, ...payload } : t));
+      setTransactions(prev => prev.map(t => (t.id === id ? ({ ...t, ...payload } as Transaction) : t)));
     }
   };
 
@@ -678,10 +678,12 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const updateAccount = async (id: string, accFields: Partial<Account>) => {
     if (!supabase) return;
 
-    const payload = {
+    const payload: Partial<Account> = {
       ...accFields,
-      name: accFields.name !== undefined ? capitalizeFirstLetter(accFields.name) : undefined,
-      financial_institution: accFields.financial_institution !== undefined ? (accFields.financial_institution ? capitalizeFirstLetter(accFields.financial_institution) : null) : undefined
+      ...(accFields.name !== undefined ? { name: capitalizeFirstLetter(accFields.name) } : {}),
+      ...(accFields.financial_institution !== undefined
+        ? { financial_institution: accFields.financial_institution ? capitalizeFirstLetter(accFields.financial_institution) : null }
+        : {})
     };
 
     const { error } = await supabase
@@ -690,7 +692,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       .eq('id', id);
 
     if (!error) {
-      setAccounts(prev => prev.map(a => a.id === id ? { ...a, ...payload } : a));
+      setAccounts(prev => prev.map(a => (a.id === id ? ({ ...a, ...payload } as Account) : a)));
     }
   };
 
@@ -726,9 +728,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const updateCategory = async (id: string, catFields: Partial<Category>) => {
     if (!supabase) return;
 
-    const payload = {
+    const payload: Partial<Category> = {
       ...catFields,
-      name: catFields.name !== undefined ? capitalizeFirstLetter(catFields.name) : undefined
+      ...(catFields.name !== undefined ? { name: capitalizeFirstLetter(catFields.name) } : {})
     };
 
     const { error } = await supabase
@@ -737,7 +739,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       .eq('id', id);
 
     if (!error) {
-      setCategories(prev => prev.map(c => c.id === id ? { ...c, ...payload } : c));
+      setCategories(prev => prev.map(c => (c.id === id ? ({ ...c, ...payload } as Category) : c)));
     }
   };
 
@@ -911,7 +913,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
 
     if (purchaseData) {
-      setCardPurchases(prev => [purchaseData, ...prev]);
+      setCardPurchases(prev => [purchaseData as unknown as CreditCardPurchase, ...prev]);
     }
 
     // 2. Gera as parcelas em transactions vinculadas ao cartão
@@ -931,7 +933,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       credit_card_id: cardId,
       category_id: categoryId || null,
       description: `${formattedDesc} (${idx + 1}/${installments})`,
-      amount: p.amount,
+      amount: p.installment_amount,
       date: p.purchase_date,
       type: 'expense' as const,
       status: 'completed' as const,
