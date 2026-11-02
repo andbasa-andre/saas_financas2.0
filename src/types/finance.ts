@@ -80,7 +80,7 @@ export interface Account {
   color: string;
   icon: string;
   is_active: boolean;
-  financial_institution?: string;
+  financial_institution?: string | null;
   created_at?: string;
 }
 
@@ -106,7 +106,7 @@ export interface Transaction {
     total_installments: number;
     parent_id?: string;
   };
-  notes?: string;
+  notes?: string | null;
   tags?: string[];
   recurring_transaction_id?: string;
   created_at?: string;
@@ -217,7 +217,7 @@ export interface Asset {
   name: string;
   type: AssetType;
   current_value: number;
-  notes?: string;
+  notes?: string | null;
 }
 
 export interface Liability {
@@ -229,7 +229,7 @@ export interface Liability {
   type: LiabilityType;
   current_value: number;
   due_date?: string;
-  notes?: string;
+  notes?: string | null;
 }
 
 export interface NetWorthSnapshot {

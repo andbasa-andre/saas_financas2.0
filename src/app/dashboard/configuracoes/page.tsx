@@ -42,11 +42,11 @@ export default function SettingsPage() {
     setIsEditingAccName(false);
   };
 
-  const handleSendWhatsAppInvite = (e: React.FormEvent) => {
+  const handleSendWhatsAppInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!invitePhone.trim()) return;
 
-    const waUrl = createWhatsAppInvite(invitePhone.trim(), inviteName.trim() || undefined);
+    const waUrl = await createWhatsAppInvite(invitePhone.trim(), inviteName.trim() || undefined);
     if (waUrl) {
       window.open(waUrl, '_blank');
       setInviteMsg('Convite gerado com sucesso! Abrindo o WhatsApp...');
